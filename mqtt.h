@@ -8,8 +8,8 @@
   / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
  /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
                                              __/ |
- Internet of Things Base Project            |___/
- For ESP8266 / ESP32
+ Glowing Square: Tube Display               |___/
+ For ESP32
  settings.h
  *
  */
