@@ -14,11 +14,16 @@
  * 
  */
 
- #define TFL_APP_ID "5ee457fb"
- #define TFL_APP_KEY "7bb4c9392c555bc1332b85f1714c2acf"
- #define STATION_ID "940GZZLUACY"
- #define TUBE_LINE "northern"
- #define DIRECTION "inbound"
+#define TFL_APP_ID "5ee457fb"
+#define TFL_APP_KEY "7bb4c9392c555bc1332b85f1714c2acf"
+#define STATION_ID "940GZZLUACY"
+#define TUBE_LINE "northern"
+#define DIRECTION "inbound"
+
+struct Departure {
+  int timeToStation;
+  const char* towards;
+};
 
 
 void displayArrivalEntry(int line, JsonVariant entry) {
@@ -61,13 +66,25 @@ boolean downloadAndDisplayTubeInfo() {
   filter[0]["timeToStation"] = true;
   filter[0]["towards"] = true;
 
+  std::vector<Departure> departures;
+
   // It's a chonky JSON document
   StaticJsonDocument<2048> json;
   deserializeJson(json, payload, DeserializationOption::Filter(filter));
+
+  for (JsonVariantConst v : json.as<JsonArray>()) {
+    departures.push_back({v["timeToStation"], v["towards"]});
+  }
+
+  std::sort(departures.begin(), departures.end(), [](const Departure &a, const Departure &b) {
+    return a.timeToStation < b.timeToStation;
+  });
+
+  
  
   for (int i = 0; i < 4; i++) {
 
-    int mins = json[i]["timeToStation"];
+    int mins = departures[i].timeToStation;
     mins = mins / 60;
 
     char formattedMins[10];
@@ -76,9 +93,9 @@ boolean downloadAndDisplayTubeInfo() {
     sprintf(formattedMins, "%im", mins);
 
     Serial.print(formattedMins);
-    Serial.println(json[i]["towards"].as<String>());
+    Serial.println(departures[i].towards);
 
-    drawStaticAndScrollingText(i*8, 50, formattedMins, json[i]["towards"].as<String>(), 255, 80, 0, 255, 255, 255);
+    drawStaticAndScrollingText(i*8, 50, formattedMins, departures[i].towards, 255, 80, 0, 255, 255, 255);
     
   }
 
