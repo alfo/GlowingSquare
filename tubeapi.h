@@ -64,8 +64,6 @@ boolean downloadAndDisplayTubeInfo() {
   // It's a chonky JSON document
   StaticJsonDocument<2048> json;
   deserializeJson(json, payload, DeserializationOption::Filter(filter));
-
-  display.clearDisplay();
  
   for (int i = 0; i < 4; i++) {
 
@@ -80,13 +78,7 @@ boolean downloadAndDisplayTubeInfo() {
     Serial.print(formattedMins);
     Serial.println(json[i]["towards"].as<String>());
 
-    display.setTextWrap(false);
-
-    display.setTextSize(1);
-    display.setTextColor(display.color565(255, 80, 0));
-    display.setCursor(0,i*8);
-    display.print(formattedMins);
-    scroll_text(i*8, 19, 50, json[i]["towards"].as<String>(), 255, 255, 255);
+    drawStaticAndScrollingText(i*8, 50, formattedMins, json[i]["towards"].as<String>(), 255, 80, 0, 255, 255, 255);
     
   }
 

@@ -58,23 +58,48 @@ void display_update_enable(bool is_enable)
 }
 
 
-unsigned long last_draw=0;
-void scroll_text(uint8_t ypos, uint8_t xpos, unsigned long scroll_delay, String text, uint8_t colorR, uint8_t colorG, uint8_t colorB)
-{
+void drawStaticAndScrollingText(uint8_t ypos, unsigned long scroll_delay, String staticText, String scrollingText, uint8_t colorR_a, uint8_t colorG_a, uint8_t colorB_a, uint8_t colorR_b, uint8_t colorG_b, uint8_t colorB_b) {
 
-    uint16_t text_length = text.length();
-    display.setTextWrap(false);  // we don't wrap text so it scrolls nicely
+    uint8_t characterWidth = 5;
+
+    uint16_t scrollingTextLength = scrollingText.length();
+    uint16_t offset = staticText.length() * 6;
+    display.setTextWrap(false);
     display.setTextSize(1);
     display.setRotation(0);
-    display.setTextColor(display.color565(colorR,colorG,colorB));
+
 
     // Asuming 5 pixel average character width
-    for (int xpos=matrix_width; xpos>-(matrix_width+text_length*5); xpos--)
-    {
-      display.setTextColor(display.color565(colorR,colorG,colorB));
-      display.clearDisplay();
-      display.setCursor(xpos,ypos);
-      display.println(text);
+    for (int xpos = offset; xpos >- (matrix_width + scrollingTextLength * characterWidth); xpos--) {
+
+      display_update_enable(false);
+
+      // Clear only the pixels on this part of the display
+      for (int x = 0; x < matrix_width; x++) {
+        for (int y = ypos; y < ypos + 8; y++) {
+          display.drawPixel(x, y, 0); 
+        }
+      }
+
+      display_update_enable(true);
+      display_update_enable(false);
+      
+      display.setTextColor(display.color565(colorR_b,colorG_b,colorB_b));
+      display.setCursor(xpos, ypos);
+      display.println(scrollingText);
+
+      for (int x = 0; x < offset; x++) {
+        for (int y = ypos; y < ypos + 8; y++) {
+          display.drawPixel(x, y, 0); 
+        }
+      }
+
+      display.setCursor(0, ypos);
+      display.setTextColor(display.color565(colorR_a,colorG_a,colorB_a));
+      display.println(staticText);
+
+      display_update_enable(true);
+      
       delay(scroll_delay);
       yield();
 
@@ -87,6 +112,12 @@ void scroll_text(uint8_t ypos, uint8_t xpos, unsigned long scroll_delay, String 
       yield();
 
     }
+
+    display.setTextColor(display.color565(colorR_b,colorG_b,colorB_b));
+    display.setCursor(offset, ypos);
+    display.println(scrollingText);
+
+    
 }
 
 
