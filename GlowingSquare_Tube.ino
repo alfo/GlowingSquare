@@ -66,10 +66,12 @@ void setup() {
   // Instantiate MQTT
   setupMQTT();
 
+  downloadAndDisplayTubeInfo();
+
 }
 
 // Variables just for the example code below
-long lastWebRequest = 0;
+long lastWebRequest;
 
 void loop() {
 
@@ -81,7 +83,7 @@ void loop() {
   ArduinoOTA.handle();    // In case we want to upload a new sketch
 
   // Only download new info every 10 seconds
-  if (now - lastWebRequest > 10000) {
+  if (now - lastWebRequest > 60000) {
 
     downloadAndDisplayTubeInfo();
 
