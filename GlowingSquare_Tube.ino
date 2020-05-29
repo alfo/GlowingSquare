@@ -21,7 +21,9 @@
 #include <PubSubClient.h>  // https://github.com/knolleary/pubsubclient ~v2.7.0
 #include <ArduinoOTA.h>    // Included with core
 #include <WiFiUdp.h>       // For the below
-
+#include <HTTPClient.h>    // fdjifdj
+#include <PxMatrix.h>      // To drive the Matrix
+#include <ArduinoSort.h>   // https://github.com/emilv/ArduinoSort
 
 #ifdef ESP32
   #include <SPIFFS.h>
@@ -38,13 +40,15 @@ int party_mode = 0; // 0 = off, 1 = chill, 2 = party
 #include "settings.h"
 #include "wifi.h"
 #include "mqtt.h"
+#include "display.h"
+#include "tubeapi.h"
 
 void setup() {
 
   // Start serial
   Serial.begin(115200);
   Serial.println();
-
+  
   // Load config from the file system
   setupStorage();
 
@@ -56,17 +60,16 @@ void setup() {
   ArduinoOTA.setPassword("chvFSEebm9X4GtpY");
   ArduinoOTA.begin();
 
+  // 
+  setupDisplay();
+
   // Instantiate MQTT
   setupMQTT();
 
-  // Usefull for all sketches really
-  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 // Variables just for the example code below
-long lastMsg = 0;
-int value = 0;
-char msg[50];
+long lastWebRequest = 0;
 
 void loop() {
 
@@ -77,23 +80,14 @@ void loop() {
   mqttLoop(now);          // Non-blocking MQTT connect/re-connect
   ArduinoOTA.handle();    // In case we want to upload a new sketch
 
-  // Only check MQTT connection and messages every two seconds
-  if (now - lastMsg > 5000) {
+  // Only download new info every 10 seconds
+  if (now - lastWebRequest > 10000) {
+
+    downloadAndDisplayTubeInfo();
 
     // Create a debug message
-    lastMsg = now;
-    snprintf (msg, 50, "hello world #%ld", ++value);
-
-    // Send a debug message
-    Serial.print("Publish message: ");
-    Serial.println(msg);
-
-    mqttClient.publish(deviceTopic, msg);
-
-    // Flash the built in LED
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(100);
-    digitalWrite(LED_BUILTIN, HIGH);
+    lastWebRequest = now;
+    
   }
 
 }
