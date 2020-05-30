@@ -74,12 +74,13 @@ boolean downloadAndDisplayTubeInfo() {
   http.end();
 
   /*
-   * Because the JSON response from TfL can be absolutely huge sometimes (especially if you want 
-   * to see departures in both directions
-   * 
+   * Because the JSON response from TfL can be and absolute chonker sometimes
+   * (especially if you want to see departures in both directions), it's too
+   * big to fit into RAM. To handle this, we can use a JSON filter
+   * to only process the data we're interested in.
+   * In this case that's the below parameters:
    */
-
-  
+   
   StaticJsonDocument<160> filter;
   filter[0]["lineName"] = true;
   filter[0]["platformName"] = true;
@@ -87,14 +88,17 @@ boolean downloadAndDisplayTubeInfo() {
   filter[0]["timeToStation"] = true;
   filter[0]["towards"] = true;
 
+  // This is what we'll store the processed departures in
   std::vector<Departure> departures;
 
   // It's a chonky JSON document
   StaticJsonDocument<2048> json;
   deserializeJson(json, payload, DeserializationOption::Filter(filter));
 
+  // We keep count of how many entries were returned for later
   int departureCount = 0;
 
+  // Loop over the returned entries and insert them into the vector list
   for (JsonVariantConst v : json.as<JsonArray>()) {
     departures.push_back({v["timeToStation"], v["towards"], v["platformName"]});
     departureCount++;
@@ -102,11 +106,13 @@ boolean downloadAndDisplayTubeInfo() {
 
   Serial.printf("Downloaded %i items from TfL\n", departureCount);
 
+  // Sort the vector list by ascending arrival time
+  // (I don't know why TfL don't do this for us but oh well)
   std::sort(departures.begin(), departures.end(), [](const Departure &a, const Departure &b) {
     return a.timeToStation < b.timeToStation;
   });
 
-  // We have four possible slots on the disaply
+  // Loop over the four possible slots on the display
   for (int i = 0; i < 4; i++) {
 
     // If this row has no matching departure entry
@@ -116,23 +122,23 @@ boolean downloadAndDisplayTubeInfo() {
       break;
     }
 
-    int mins = departures[i].timeToStation;
-    mins = mins / 60;
-
-
+    // Convert seconds to minutes and format it nicely
     char formattedMins[10];
-    sprintf(formattedMins, "%im", mins);
+    sprintf(formattedMins, "%im", departures[i].timeToStation / 60);
 
     Serial.printf("%s %s %s\n", formattedMins, departures[i].towards, departures[i].platform);
 
+    // Append the platform name to the displayed text if required
     #ifdef SHOW_PLATFORM
       String scrollingText = (String)departures[i].towards + " " + (String)departures[i].platform;
     #else
       String scrollingText = (String)departures[i].towards
     #endif
-    
+
+    // Draw all of our data to the display
     drawStaticAndScrollingText(i*8, 50, formattedMins, scrollingText, 255, 80, 0, 150, 150, 150);
 
+    // Wait before doign the next one
     delay(1000);
     
   }
