@@ -54,13 +54,13 @@ void setup() {
   // Start up WiFi and config parameters etc.
   startWiFiManagerWithParameters();
 
+  // Must go after the SPIFFs stuff or we crash the ESP32
+  setupDisplay();
+
   // Start ArduinoOTA service
   // So not just anyone can re-flash our devices
   ArduinoOTA.setPassword("chvFSEebm9X4GtpY");
   ArduinoOTA.begin();
-
-  // Must go after the SPIFFs stuff or we crash the ESP32
-  setupDisplay();
 
   // Instantiate MQTT
   setupMQTT();

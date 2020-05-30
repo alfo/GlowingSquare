@@ -57,6 +57,29 @@ void fillBlankRow(uint8_t ypos) {
   }
 }
 
+void drawScrollingText(uint8_t ypos, int xpos, String scrollingText, uint8_t colorR_b, uint8_t colorG_b, uint8_t colorB_b) {
+  // Write the scrolling text in its current position
+  display.setTextColor(display.color565(colorR_b,colorG_b,colorB_b));
+  display.setCursor(xpos, ypos);
+  display.println(scrollingText);
+}
+
+void drawStaticText(uint8_t ypos, uint16_t offset, String staticText, uint8_t colorR_a, uint8_t colorG_a, uint8_t colorB_a) {
+
+  // Write black over the area the static text will take up
+  for (int x = 0; x < offset; x++) {
+    for (int y = ypos; y < ypos + 8; y++) {
+      display.drawPixel(x, y, 0);
+    }
+  }
+
+  // Draw the static text
+  display.setCursor(0, ypos);
+  display.setTextColor(display.color565(colorR_a,colorG_a,colorB_a));
+  display.println(staticText);
+  
+}
+
 void drawStaticAndScrollingText(uint8_t ypos, unsigned long scroll_delay, String staticText, String scrollingText, uint8_t colorR_a, uint8_t colorG_a, uint8_t colorB_a, uint8_t colorR_b, uint8_t colorG_b, uint8_t colorB_b) {
 
   // Asuming 5 pixel average character width
@@ -75,22 +98,9 @@ void drawStaticAndScrollingText(uint8_t ypos, unsigned long scroll_delay, String
     // Clear only the pixels on this part of the display
     fillBlankRow(ypos);
 
-    // Write the scrolling text in its current position
-    display.setTextColor(display.color565(colorR_b,colorG_b,colorB_b));
-    display.setCursor(xpos, ypos);
-    display.println(scrollingText);
+    drawScrollingText(ypos, xpos, scrollingText, colorR_b, colorG_b, colorB_b);
 
-    // Write black over the area the static text will take up
-    for (int x = 0; x < offset; x++) {
-      for (int y = ypos; y < ypos + 8; y++) {
-        display.drawPixel(x, y, 0);
-      }
-    }
-
-    // Draw the static text
-    display.setCursor(0, ypos);
-    display.setTextColor(display.color565(colorR_a,colorG_a,colorB_a));
-    display.println(staticText);
+    drawStaticText(ypos, offset, staticText, colorR_a, colorG_a, colorB_a);
 
     // Draw the updates to the display
     display.showBuffer();
@@ -106,9 +116,9 @@ void drawStaticAndScrollingText(uint8_t ypos, unsigned long scroll_delay, String
 
   // Write the scrolling text again, once the scroll has finished
   // so that it persists while we're scrolling the other lines
-  display.setTextColor(display.color565(colorR_b,colorG_b,colorB_b));
-  display.setCursor(offset, ypos);
-  display.println(scrollingText);
+  fillBlankRow(ypos);
+  drawScrollingText(ypos, offset, scrollingText, colorR_b, colorG_b, colorB_b);
+  drawStaticText(ypos, 0, staticText, colorR_a, colorG_a, colorB_a);
 
   // Send the final line to the display
   display.showBuffer();
