@@ -42,7 +42,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       party_mode = 1;
     } else if (strcmp (json["party"], "on") == 0) {
       Serial.println("^^^ Mode change: Normal party");
-      party_mode = 1;
+      party_mode = 2;
     } else if (strcmp (json["party"], "off") == 0) {
       Serial.println("^^^ Mode change: No party");
       party_mode = 0;

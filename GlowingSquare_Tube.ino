@@ -14,7 +14,7 @@
  *
  */
 
- // Include Libraries
+// Include Libraries
 #include <FS.h>            // this needs to be first, or it all crashes and burns...
 #include <WiFiManager.h>   // https://github.com/tzapu/WiFiManager ~v2.0.0
 #include <ArduinoJson.h>   // https://github.com/bblanchon/ArduinoJson ~v6.x.x
@@ -22,8 +22,7 @@
 #include <ArduinoOTA.h>    // Included with core
 #include <WiFiUdp.h>       // For the below
 #include <HTTPClient.h>    // fdjifdj
-#include <PxMatrix.h>      // To drive the Matrix
-#include <ArduinoSort.h>   // https://github.com/emilv/ArduinoSort
+                           // PxMatrix is included from inside the display.h file
 
 #ifdef ESP32
   #include <SPIFFS.h>
@@ -60,7 +59,7 @@ void setup() {
   ArduinoOTA.setPassword("chvFSEebm9X4GtpY");
   ArduinoOTA.begin();
 
-  // 
+  // Must go after the SPIFFs stuff or we crash the ESP32
   setupDisplay();
 
   // Instantiate MQTT

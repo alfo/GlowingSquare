@@ -72,30 +72,42 @@ boolean downloadAndDisplayTubeInfo() {
   StaticJsonDocument<2048> json;
   deserializeJson(json, payload, DeserializationOption::Filter(filter));
 
+  serializeJsonPretty(json, Serial);
+
+  int departureCount = 0;
+
   for (JsonVariantConst v : json.as<JsonArray>()) {
     departures.push_back({v["timeToStation"], v["towards"]});
+    departureCount++;
   }
 
   std::sort(departures.begin(), departures.end(), [](const Departure &a, const Departure &b) {
     return a.timeToStation < b.timeToStation;
   });
 
-  
- 
+  // We have four possible slots on the disaply
   for (int i = 0; i < 4; i++) {
+
+    // If this row has no matching departure entry
+    // then clear the row and skip
+    if (i >= departureCount) {
+      fillBlankRow(i*8);
+      break;
+    }
 
     int mins = departures[i].timeToStation;
     mins = mins / 60;
 
+
     char formattedMins[10];
-
-
     sprintf(formattedMins, "%im", mins);
 
     Serial.print(formattedMins);
     Serial.println(departures[i].towards);
 
-    drawStaticAndScrollingText(i*8, 50, formattedMins, departures[i].towards, 255, 80, 0, 255, 255, 255);
+    drawStaticAndScrollingText(i*8, 50, formattedMins, departures[i].towards, 255, 80, 0, 150, 150, 150);
+
+    delay(1000);
     
   }
 
