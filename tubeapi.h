@@ -30,11 +30,14 @@ struct Departure {
   const char* platform;
 };
 
+// This is what we'll store the processed departures in
+std::vector<Departure> departures;
+
 // Keep track of whether our last request failed
 boolean offline = true;
 
 // Function that runs from loop() every 60 seconds
-boolean downloadAndDisplayTubeInfo() {
+int downloadTubeInfo() {
 
   HTTPClient http;
 
@@ -88,23 +91,19 @@ boolean downloadAndDisplayTubeInfo() {
   filter[0]["timeToStation"] = true;
   filter[0]["towards"] = true;
 
-  // This is what we'll store the processed departures in
-  std::vector<Departure> departures;
-
   // It's a chonky JSON document
   StaticJsonDocument<2048> json;
   deserializeJson(json, payload, DeserializationOption::Filter(filter));
 
-  // We keep count of how many entries were returned for later
-  int departureCount = 0;
+  // Remove the previous departures
+  departures.clear();
 
   // Loop over the returned entries and insert them into the vector list
   for (JsonVariantConst v : json.as<JsonArray>()) {
     departures.push_back({v["timeToStation"], v["towards"], v["platformName"]});
-    departureCount++;
   }
 
-  Serial.printf("Downloaded %i items from TfL\n", departureCount);
+  Serial.printf("Downloaded %i items from TfL\n", departures.size());
 
   // Sort the vector list by ascending arrival time
   // (I don't know why TfL don't do this for us but oh well)
@@ -112,12 +111,16 @@ boolean downloadAndDisplayTubeInfo() {
     return a.timeToStation < b.timeToStation;
   });
 
+}
+
+void displayTubeInfo() {
+
   // Loop over the four possible slots on the display
   for (int i = 0; i < 4; i++) {
 
     // If this row has no matching departure entry
     // then clear the row and skip
-    if (i >= departureCount) {
+    if (i >= departures.size()) {
       fillBlankRow(i*8);
       break;
     }

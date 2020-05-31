@@ -96,7 +96,8 @@ void loop() {
     // Only download new info every 10 seconds
     if (now - lastWebRequest > INFO_UPDATE_INTERVAL) {
   
-      downloadAndDisplayTubeInfo();
+      downloadTubeInfo();
+      displayTubeInfo();
   
       // Create a debug message
       lastWebRequest = now;
