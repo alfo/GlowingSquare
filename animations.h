@@ -18,6 +18,12 @@ Patterns:
 
 */
 
+unsigned long ms_current  = 0;
+unsigned long ms_previous = 0;
+unsigned long ms_animation_max_duration = 60000; // 10 seconds
+unsigned long next_frame = 0;
+
+
 void setupAnimations() {
   effects.Setup();
 

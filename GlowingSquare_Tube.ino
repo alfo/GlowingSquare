@@ -34,6 +34,9 @@
 // Which room in the house is this project
 char room[30] = "living_room";
 int party_mode = 0; // 0 = off, 1 = chill, 2 = party
+int last_party_mode = party_mode;
+
+#define INFO_UPDATE_INTERVAL 60000
 
 // Include the other sketch files
 #include "settings.h"
@@ -68,12 +71,10 @@ void setup() {
 
   setupAnimations();
 
-  downloadAndDisplayTubeInfo();
-
 }
 
 // Variables just for the example code below
-long lastWebRequest;
+long lastWebRequest = -INFO_UPDATE_INTERVAL;
 
 void loop() {
 
@@ -81,17 +82,33 @@ void loop() {
   long now = millis();
 
   // Loop our network services
-  mqttLoop(now);          // Non-blocking MQTT connect/re-connect
+  mqttLoop();          // Non-blocking MQTT connect/re-connect
   ArduinoOTA.handle();    // In case we want to upload a new sketch
 
-  // Only download new info every 10 seconds
-  if (now - lastWebRequest > 60000) {
+  if (party_mode != last_party_mode) {
+    display.clearDisplay();
+    last_party_mode = party_mode;
+  }
 
-    downloadAndDisplayTubeInfo();
+  // Show tube stuff only if party mode is off
+  if (party_mode == 0) {
 
-    // Create a debug message
-    lastWebRequest = now;
+    // Only download new info every 10 seconds
+    if (now - lastWebRequest > INFO_UPDATE_INTERVAL) {
+  
+      downloadAndDisplayTubeInfo();
+  
+      // Create a debug message
+      lastWebRequest = now;
+      
+    }
+    
+  } else {
+
+    patternLoop();
     
   }
+
+  
 
 }

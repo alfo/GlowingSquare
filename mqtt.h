@@ -22,7 +22,7 @@ char inTopic[40];
 char willTopic[40];
 char roomStateTopic[40];
 
-long lastMQTTReconnectAttempt = 0;
+long lastMQTTReconnectAttempt = -5000;
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
@@ -99,7 +99,9 @@ boolean mqttConnect() {
 
 }
 
-void mqttLoop(long now) {
+void mqttLoop() {
+
+  long now = millis();
 
   // Maintain connection
   // This is also how we connect for the first time
