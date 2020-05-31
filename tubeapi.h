@@ -16,9 +16,10 @@
 
 #define TFL_APP_ID "5ee457fb"
 #define TFL_APP_KEY "7bb4c9392c555bc1332b85f1714c2acf"
-#define STATION_ID "940GZZLUACY"  // https://api.tfl.gov.uk/swagger/ui/index.html?url=/swagger/docs/v1#!/StopPoint/StopPoint_Search
-#define TUBE_LINE "northern"      // https://api.tfl.gov.uk/swagger/ui/index.html?url=/swagger/docs/v1#!/Line/Line_Arrivals
-#define DIRECTION "inbound" // Options are "outbound", "inbound", or "" for both
+
+// The TfL Station ID is saved into config, comes from here: https://api.tfl.gov.uk/swagger/ui/index.html?url=/swagger/docs/v1#!/StopPoint/StopPoint_Search
+// The TfL Route is saved into config, test it out here: https://api.tfl.gov.uk/swagger/ui/index.html?url=/swagger/docs/v1#!/Line/Line_Arrivals
+// The TfL direction is saved into config, options are "outbound", "inbound", or "" for both
 
 #define SHOW_PLATFORM // If you want to include the departure platform in the scrolling text
 
@@ -43,7 +44,7 @@ int downloadTubeInfo() {
 
   // This is the API endpoint that we fetch new departures for our station from
   char requestURL[256];  
-  sprintf(requestURL, "https://api.tfl.gov.uk/Line/%s/Arrivals/%s?direction=%s&app_key=%s&app_id=%s", TUBE_LINE, STATION_ID, DIRECTION, TFL_APP_KEY, TFL_APP_ID);
+  sprintf(requestURL, "https://api.tfl.gov.uk/Line/%s/Arrivals/%s?direction=%s&app_key=%s&app_id=%s", tfl_route, tfl_station_id, tfl_direction, TFL_APP_KEY, TFL_APP_ID);
 
   // Fetch the data from the server
   http.begin(requestURL);

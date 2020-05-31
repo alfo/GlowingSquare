@@ -20,6 +20,10 @@ char mqtt_server[40];
 char mqtt_port[6]  = "1883";
 char mqtt_username[40];
 char mqtt_password[40];
+char tfl_station_id[24] = "940GZZLUACY";
+char tfl_route[24] = "northern";
+char tfl_direction[8] = "inbound";
+
 
 // Default custom static IP (not always used)
 char static_ip[16] = "10.0.3.255";
@@ -70,6 +74,9 @@ void setupStorage(){
           strcpy(mqtt_port, json["mqtt_port"]);
           strcpy(mqtt_username, json["mqtt_username"]);
           strcpy(mqtt_password, json["mqtt_password"]);
+          strcpy(tfl_station_id, json["tfl_station_id"]);
+          strcpy(tfl_route, json["tfl_route"]);
+          strcpy(tfl_direction, json["tfl_direction"]);
           
 
 //           if(json["ip"]) {
@@ -102,6 +109,9 @@ void saveConfig() {
   json["mqtt_username"]  = mqtt_username;
   json["mqtt_password"]  = mqtt_password;
   json["hostname"]       = hostname;
+  json["tfl_station_id"] = tfl_station_id;
+  json["tfl_route"]      = tfl_route;
+  json["tfl_direction"]  = tfl_direction;
 
   // json["ip"]          = WiFi.localIP().toString();
   // json["gateway"]     = WiFi.gatewayIP().toString();

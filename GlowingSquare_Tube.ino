@@ -28,7 +28,7 @@
   #include <SPIFFS.h>
 #endif
 
-// Uncomment to reset device memory
+// Uncomment to reset device memory (useful to fix corruption / force new settings)
 //#define START_ANEW
 
 // Which room in the house is this project
@@ -42,8 +42,8 @@ uint8_t currentDisplayBrightness = 255;
 
 // Include the other sketch files
 #include "settings.h"
-#include "wifi.h"
 #include "display.h"
+#include "wifi.h"
 #include "tubeapi.h"
 #include "animations.h"
 #include "mqtt.h"

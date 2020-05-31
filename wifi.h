@@ -20,11 +20,17 @@ const unsigned long AP_TIMEOUT = 60; // Wait 20 Seconds in the config portal bef
 // In case we want to do something when WiFiManager enters configuration mode
 void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.println("[CALLBACK] configModeCallback fired");
+  display.setCursor(0,0);
+  display.setBrightness(255);
+  display.println("AP started...");
+  display.showBuffer();
 }
 
 // In case we want to do something when the WiFi settings are saved
 void saveWifiCallback(){
   Serial.println("[CALLBACK] saveCallback fired");
+  display.clearDisplay();
+  display.showBuffer();
 }
 
 // To be called once in setup()
@@ -47,11 +53,17 @@ void startWiFiManagerWithParameters() {
   WiFiManagerParameter custom_mqtt_port("port", "MQTT Port", mqtt_port, 6);
   WiFiManagerParameter custom_mqtt_username("username", "MQTT Username", mqtt_username, 32);
   WiFiManagerParameter custom_mqtt_password("password", "MQTT Password", mqtt_password, 32);
+  WiFiManagerParameter custom_tfl_station_id("station_id", "TfL Station ID", tfl_station_id, 24);
+  WiFiManagerParameter custom_tfl_route("route", "TfL Route (circle, H91)", tfl_route, 24);
+  WiFiManagerParameter custom_tfl_direction("direction", "TfL Direction (inbound, outbound, empty)", tfl_direction, 24);
   wm.addParameter(&custom_hostname);
   wm.addParameter(&custom_mqtt_server);
   wm.addParameter(&custom_mqtt_port);
   wm.addParameter(&custom_mqtt_username);
   wm.addParameter(&custom_mqtt_password);
+  wm.addParameter(&custom_tfl_station_id);
+  wm.addParameter(&custom_tfl_route);
+  wm.addParameter(&custom_tfl_direction);
   
   //reset settings - wipe credentials for testing, if defined
   #if defined(START_ANEW)
