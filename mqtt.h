@@ -17,12 +17,16 @@
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
+// If we don't want to use the hostname
+// Useful if we'll have several of these devices in one room
+#define MQTT_NAME "glowingsquare/tube"
+
 char deviceTopic[40];
 char inTopic[40];
 char willTopic[40];
 char roomStateTopic[40];
 
-long lastMQTTReconnectAttempt = -5000;
+long lastMQTTReconnectAttempt = -10000;
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
@@ -35,22 +39,35 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   Serial.print("\n");
 
   // Handle room-wide topic messages
-  if (strcmp (topic, roomStateTopic) == 0) {
+  if (strcmp(topic, roomStateTopic) == 0) {
 
-    if (strcmp (json["party"], "chill") == 0) {
+    if (strcmp(json["party"], "chill") == 0) {
       Serial.println("^^^ Mode change: Chill party");
       party_mode = 1;
-    } else if (strcmp (json["party"], "on") == 0) {
+    } else if (strcmp(json["party"], "on") == 0) {
       Serial.println("^^^ Mode change: Normal party");
       party_mode = 2;
-    } else if (strcmp (json["party"], "off") == 0) {
+    } else if (strcmp(json["party"], "off") == 0) {
       Serial.println("^^^ Mode change: No party");
       party_mode = 0;
     }
     
   }
 
-  //mqttClient.publish("octodisplay/debug", message);
+  if (strcmp(topic, inTopic) == 0) {
+
+    if (json["brightness"] || json["brightness"] == 0) {
+
+      targetDisplayBrightness = json["brightness"].as<int>();
+      
+    }
+    
+  }
+
+  if (party_mode != last_party_mode) {
+    display.clearDisplay();
+    last_party_mode = party_mode;
+  }
 
 }
 
@@ -120,16 +137,27 @@ void mqttLoop() {
 // It just takes the config (which has been loaded by this point)
 void setupMQTT() {
 
+  char deviceID[40];
+  
+  #ifdef MQTT_NAME
+    strcpy(deviceID, MQTT_NAME);
+  #else 
+    strcpy(deviceID, hostname);
+  #endif
+
   // Format the topics to include the hostname
-  sprintf(willTopic,"%s/mqtt", hostname);
-  sprintf(inTopic,"%s/in", hostname);
-  sprintf(deviceTopic,"%s/out", hostname);
-  sprintf(roomStateTopic,"house/%s/state", room);
+  sprintf(willTopic,"%s/%s/mqtt", room, deviceID);
+  sprintf(inTopic,"%s/%s/in", room, deviceID);
+  sprintf(deviceTopic,"%s/%s/out", room, deviceID);
+  sprintf(roomStateTopic,"%s/state", room);
 
   // We store the port as a char[6] so need to convert
   mqttClient.setServer(mqtt_server, atoi(mqtt_port));
   mqttClient.setCallback(mqttCallback);
 
   // Loop once to receive any initial messages
-  mqttLoop();
+  for (int i = 0; i < 10; i++) {
+    mqttLoop();
+    delay(100);
+  }
 }

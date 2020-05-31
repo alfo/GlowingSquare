@@ -35,16 +35,18 @@
 char room[30] = "living_room";
 int party_mode = 0; // 0 = off, 1 = chill, 2 = party
 int last_party_mode = party_mode;
+uint8_t targetDisplayBrightness = 255;
+uint8_t currentDisplayBrightness = 255;
 
 #define INFO_UPDATE_INTERVAL 60000
 
 // Include the other sketch files
 #include "settings.h"
 #include "wifi.h"
-#include "mqtt.h"
 #include "display.h"
 #include "tubeapi.h"
 #include "animations.h"
+#include "mqtt.h"
 
 void setup() {
 
@@ -85,13 +87,12 @@ void loop() {
   mqttLoop();          // Non-blocking MQTT connect/re-connect
   ArduinoOTA.handle();    // In case we want to upload a new sketch
 
-  if (party_mode != last_party_mode) {
-    display.clearDisplay();
-    last_party_mode = party_mode;
-  }
-
   // Show tube stuff only if party mode is off
   if (party_mode == 0) {
+
+    // We need to use the blocking fade because the
+    // actual displaying of info is blocking too
+    changeBrightnessBlocking(3000);
 
     // Only download new info every 10 seconds
     if (now - lastWebRequest > INFO_UPDATE_INTERVAL) {
@@ -106,10 +107,13 @@ void loop() {
     
   } else {
 
+    // Use a non-blocking fade so the animation can continue
+    // smoothly as we fade 
+    changeBrightnessNonBlocking();
+
+    // Draw the next frame of our patterns
     patternLoop();
     
   }
-
-  
 
 }

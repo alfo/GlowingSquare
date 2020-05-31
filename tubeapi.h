@@ -143,10 +143,6 @@ void displayTubeInfo() {
 
     // Wait before doign the next one
     delay(1000);
-
-    // It's dodge af to put this function here but it's so that mode 
-    // changes in between lines of text cos it takes forever
-    mqttLoop();
     
   }
 

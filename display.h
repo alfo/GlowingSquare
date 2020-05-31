@@ -141,9 +141,73 @@ void setupDisplay() {
   // We never want text to wrap in this project
   display.setTextWrap(false);
 
+  display.setBrightness(currentDisplayBrightness);
+
   // More display setup bits taken from the double_buffer demo
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &display_updater, true);
   timerAlarmWrite(timer, 4000, true);
   timerAlarmEnable(timer);
+}
+
+void changeBrightnessBlocking(int fadeTime) {
+
+  // Calculate how far we have to fade
+  int change = targetDisplayBrightness - currentDisplayBrightness;
+
+  // We have some fading to do
+  if (change != 0) {
+
+    // We fade at a 50Hz rate cos it makes the maths easier
+    int step = change / (fadeTime / 20);
+
+    Serial.printf("Fading from %i to %i brightness in steps of %i\n", currentDisplayBrightness, targetDisplayBrightness, step);
+
+    while(currentDisplayBrightness != targetDisplayBrightness) {
+
+      // This also supports steps being negative for fade downs
+      currentDisplayBrightness += step;
+
+      display.setBrightness(currentDisplayBrightness);
+
+      // 50Hz there it is again
+      delay(20);
+
+      // In the case that the next step would take us past the desired target value
+      if (abs(targetDisplayBrightness - currentDisplayBrightness) <= abs(step)) {
+
+        // Stop there and set the display again
+        currentDisplayBrightness = targetDisplayBrightness;
+        display.setBrightness(currentDisplayBrightness);
+      }
+      
+    }
+
+    // Mark the fade as having completed
+    currentDisplayBrightness = targetDisplayBrightness;
+
+    Serial.println("Fade complete");
+
+  }
+
+}
+
+void changeBrightnessNonBlocking() {
+
+  int change = targetDisplayBrightness - currentDisplayBrightness;
+
+  if (change != 0) {
+
+    Serial.println(currentDisplayBrightness);
+
+    if (change > 0) {
+      currentDisplayBrightness += 1;
+    } else if (change < 0) {
+      currentDisplayBrightness -= 1;
+    }
+
+    display.setBrightness(currentDisplayBrightness);
+    
+  }
+
 }
