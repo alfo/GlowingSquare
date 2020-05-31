@@ -27,7 +27,7 @@ unsigned long next_frame = 0;
 void setupAnimations() {
   effects.Setup();
 
-  patterns.setPattern(0);
+  patterns.setPattern(1);
   patterns.start();
 }
 

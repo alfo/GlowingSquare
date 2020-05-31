@@ -54,21 +54,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 }
 
-// This runs once from setup() in the main sketch
-// It just takes the config (which has been loaded by this point)
-void setupMQTT() {
-
-  // Format the topics to include the hostname
-  sprintf(willTopic,"%s/mqtt", hostname);
-  sprintf(inTopic,"%s/in", hostname);
-  sprintf(deviceTopic,"%s/out", hostname);
-  sprintf(roomStateTopic,"house/%s/state", room);
-
-  // We store the port as a char[6] so need to convert
-  mqttClient.setServer(mqtt_server, atoi(mqtt_port));
-  mqttClient.setCallback(mqttCallback);
-}
-
 boolean mqttConnect() {
 
   Serial.print("=== MQTT connecting to ");
@@ -99,6 +84,9 @@ boolean mqttConnect() {
 
 }
 
+
+// Runs repeatedly from loop() in the main sketch
+// Maintains the connection and checks for new messages
 void mqttLoop() {
 
   long now = millis();
@@ -126,4 +114,22 @@ void mqttLoop() {
     
   }
 
+}
+
+// This runs once from setup() in the main sketch
+// It just takes the config (which has been loaded by this point)
+void setupMQTT() {
+
+  // Format the topics to include the hostname
+  sprintf(willTopic,"%s/mqtt", hostname);
+  sprintf(inTopic,"%s/in", hostname);
+  sprintf(deviceTopic,"%s/out", hostname);
+  sprintf(roomStateTopic,"house/%s/state", room);
+
+  // We store the port as a char[6] so need to convert
+  mqttClient.setServer(mqtt_server, atoi(mqtt_port));
+  mqttClient.setCallback(mqttCallback);
+
+  // Loop once to receive any initial messages
+  mqttLoop();
 }
