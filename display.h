@@ -198,8 +198,6 @@ void changeBrightnessNonBlocking() {
 
   if (change != 0) {
 
-    Serial.println(currentDisplayBrightness);
-
     if (change > 0) {
       currentDisplayBrightness += 1;
     } else if (change < 0) {

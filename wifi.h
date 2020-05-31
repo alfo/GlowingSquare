@@ -31,23 +31,15 @@ void saveWifiCallback(){
 // Just to make the main sketch cleaner
 void startWiFiManagerWithParameters() {
 
-  // I've been told this line is a good idea
-  WiFi.mode(WIFI_STA);
-  
-  // Set hostname from settings
-  // It's particularly dumb that they don't use the same method
-  #ifdef ESP32
-    WiFi.setHostname(hostname);
-  #else
-    WiFi.hostname(hostname);
-  #endif
-  
   // WiFiManager bits and pieces
   WiFiManager wm;
   wm.setSaveConfigCallback(saveConfigCallback);
   wm.setConnectTimeout(CONNECT_TIMEOUT);
   wm.setTimeout(AP_TIMEOUT);
   wm.setCountry("GB");
+
+  // Set hostname from settings
+  wm.setHostname(hostname);
   
   // WiFiManager custom config
   WiFiManagerParameter custom_hostname("hostname", "Hostname", hostname, 24);
@@ -79,6 +71,8 @@ void startWiFiManagerWithParameters() {
     // Not sure if this line is necessary
     delay(5000);
   }
+
+  
 
   // Keeping this line cos it's cute
   Serial.println("Connected ...yeey :)");

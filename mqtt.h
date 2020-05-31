@@ -64,8 +64,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     
   }
 
+  // This clears the display if we're changing display modes
+  // Because otherwise the last frame of the previous thing will
+  // remain until the new code has completed
   if (party_mode != last_party_mode) {
     display.clearDisplay();
+    display.showBuffer();
     last_party_mode = party_mode;
   }
 
