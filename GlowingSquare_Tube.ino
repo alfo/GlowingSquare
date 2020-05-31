@@ -20,9 +20,9 @@
 #include <ArduinoJson.h>   // https://github.com/bblanchon/ArduinoJson ~v6.x.x
 #include <PubSubClient.h>  // https://github.com/knolleary/pubsubclient ~v2.7.0
 #include <ArduinoOTA.h>    // Included with core
-#include <WiFiUdp.h>       // For the below
-#include <HTTPClient.h>    // fdjifdj
+#include <HTTPClient.h>    // To fetch data 
                            // PxMatrix is included from inside the display.h file
+#include <FastLED.h>       // For the animations during party mode
 
 #ifdef ESP32
   #include <SPIFFS.h>
@@ -41,6 +41,7 @@ int party_mode = 0; // 0 = off, 1 = chill, 2 = party
 #include "mqtt.h"
 #include "display.h"
 #include "tubeapi.h"
+#include "animations.h"
 
 void setup() {
 
@@ -64,6 +65,8 @@ void setup() {
 
   // Instantiate MQTT
   setupMQTT();
+
+  setupAnimations();
 
   downloadAndDisplayTubeInfo();
 
