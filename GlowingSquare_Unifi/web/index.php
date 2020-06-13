@@ -24,6 +24,9 @@ function formatBytes($bytes, $precision = 2) {
     // $bytes /= pow(1024, $pow);
     $bytes /= (1 << (10 * $pow));
 
+    // If we're using TB then allow for one more DP
+    if ($pow == 4) $precision++;
+
     return round($bytes, $precision) . $units[$pow];
 }
 
@@ -90,8 +93,8 @@ foreach ($daily_stats as $stat) {
 }
 
 // Format the byte counts into something more readable
-$out['month_rx'] = formatBytes($raw_month_tx, 0);
-$out['month_tx'] = formatBytes($raw_month_rx, 0);
+$out['month_tx'] = formatBytes($raw_month_tx, 0);
+$out['month_rx'] = formatBytes($raw_month_rx, 0);
 
 /*
   Minute-by-minute graph

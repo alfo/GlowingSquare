@@ -38,7 +38,7 @@ int last_party_mode = party_mode;
 uint8_t targetDisplayBrightness = 255;
 uint8_t currentDisplayBrightness = 255;
 
-#define INFO_UPDATE_INTERVAL 10000
+#define INFO_UPDATE_INTERVAL 30000
 
 // Include the other sketch files
 #include "settings.h"

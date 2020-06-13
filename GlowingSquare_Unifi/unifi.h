@@ -53,37 +53,31 @@ boolean downloadAndDisplayNetworkInfo() {
   
   serializeJsonPretty(json, Serial);
 
-  //Serial.printf("Downloaded flight: %s (%s %s) from %s to %s at %ikts %ift\n", flight.number, flight.aircraft, flight.reg, flight.from, flight.to, flight.speed, flight.altitude);
+  display.clearDisplay();
+  display.setTextColor(myWHITE);
+  
+  display.setCursor(0,0);
+  display.print(json["month_rx"].as<String>());
+  display.print(" ");
+  display.print(json["month_tx"].as<String>());
+  
 
-  return true;
+  display.setTextColor(myCYAN);
+  display.setCursor(0,8);
+  display.print(json["clients"].as<int>());
+  display.print(" ");
+  display.print(json["guests"].as<int>());
 
-}
 
-void displayFlightInfo() {
+  for (int x = 0; x < MATRIX_WIDTH; x++) {
 
-//  display.clearDisplay();
-//  display.setTextColor(myCYAN);
-//  
-//  display.setCursor(OFFSETX,0);
-//  display.print(flight.from);
-//  display.setTextColor(myCYAN);
-//  display.print(">");
-//  
-//  display.print(flight.to);
-//  display.setCursor(OFFSETX,8);
-//  display.setTextColor(myWHITE);
-//  display.print(flight.number);
-//  if(flight.altitude>10000) display.setTextColor(myGREEN);
-//  else display.setTextColor(myRED);
-//  display.setCursor(OFFSETX,16);
-//  display.print(flight.altitude);
-//  display.print("ft");
-//  display.setCursor(OFFSETX,24);
-//  display.setTextColor(myWHITE);
-//  display.print(flight.speed);
-//  display.print("kts");
-//  display.setTextColor(myCYAN);
-//  display.print(flight.aircraft);
+    for (int y = 0; y < json["graph"][x]; y++) {
+      display.drawPixel(x, MATRIX_HEIGHT - 1 - y, myMAGENTA);
+    }
+    
+  }
+
+  drawStaticAndScrollingText(16, 50, "New:", json["newest"].as<String>(), 255, 255, 255, 255, 255, 255);
 
   display.showBuffer();
   
