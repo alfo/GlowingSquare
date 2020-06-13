@@ -38,17 +38,39 @@ $site_id = 'default';
 $unifi_connection = new UniFi_API\Client($controlleruser, $controllerpassword, $controllerurl, $site_id, $controllerversion);
 $set_debug_mode   = $unifi_connection->set_debug($debug);
 $loginresults     = $unifi_connection->login();
-$clients_array    = $unifi_connection->list_clients();
+$clients          = $unifi_connection->list_clients();
 $minute_stats     = $unifi_connection->stat_5minutes_site();
 $daily_stats      = $unifi_connection->stat_daily_site();
 
 $out = [];
+
+/*
+  Client Stats
+*/
 $out['clients'] = 0;
 $out['guests'] = 0;
 $out['wireless'] = 0;
 $out['wired'] = 0;
 $raw_month_tx = 0;
 $raw_month_rx = 0;
+$min_uptime = 9999999999;
+
+// Count the different types of clients
+foreach ($clients as $client) {
+
+  $out['clients']++;
+
+  if ($client->is_guest) $out['guests']++;
+  if ($client->is_wired) $out['wired']++;
+    else $out['wireless']++;
+
+  if ($client->uptime < $min_uptime) {
+    $out['newest'] = $client->hostname;
+    $min_uptime = $client->uptime;
+  }
+
+
+}
 
 /*
   Monthly Stats
@@ -99,25 +121,10 @@ foreach (array_slice($minute_stats, -$graph_width, $graph_width) as $stat) {
 
 }
 
-//$out['max'] = $max_graph;
-/*
-  Client Stats
-*/
-
-// Count the different types of clients
-foreach ($clients_array as $client) {
-
-  $out['clients']++;
-
-  if ($client->is_guest) $out['guests']++;
-  if ($client->is_wired) $out['wired']++;
-    else $out['wireless']++;
-
-}
 
 /**
  * output the results in JSON format
  */
 header('Content-Type: application/json; charset=utf-8');
-//echo json_encode($minute_stats, JSON_PRETTY_PRINT);
+//echo json_encode($clients, JSON_PRETTY_PRINT);
 echo json_encode($out);
