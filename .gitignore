@@ -1,5 +1,6 @@
 # ignore all logs
 *.log
 
+.DS_Store
 
 config.php
