@@ -14,17 +14,18 @@
  * 
  */
 
-#define AREA "52.05,51.14,-1.30,0.68"
+#define AREA "51.5672,51.4131,-0.4146,0.1107"
+#define OFFSETX 0
 
 boolean offline = false;
 
 // Struct to store the information about the downloaded flight
 struct Flight {
-  char* from;
-  char* to;
-  char* number;
-  char* reg;
-  char* aircraft;
+  char from[4];
+  char to[4];
+  char number[8];
+  char reg[12];
+  char aircraft[12];
   unsigned int speed;
   unsigned int altitude;
 };
@@ -33,7 +34,7 @@ struct Flight {
 Flight flight;
 
 // Function that runs from loop() every 60 seconds
-int downloadFlightInfo() {
+boolean downloadFlightInfo() {
 
   HTTPClient http;
 
@@ -51,7 +52,6 @@ int downloadFlightInfo() {
     
     // Mark us as offline so the little icon will be drawn next time
     offline = true;
-    return false;
     
   } else {
 
@@ -59,44 +59,62 @@ int downloadFlightInfo() {
     offline = false;
   }
 
-  
   String payload = http.getString();
 
-  if (payload.length() == 0) {
-
-    // Sometimes there will just be no departures, cos the station is closed etc.
-    Serial.println("No data received from FlightAware");
-    return false;
-  }
-
-  // Close the HTTPClient to free memory
-  http.end();
-
-  // It's a chonky JSON document
   StaticJsonDocument<2048> json;
   deserializeJson(json, payload);
 
-  serializeJsonPretty(json, Serial);
-
   JsonObject object = json.as<JsonObject>();
+  
+  if (object.size() < 3) {
+    Serial.println("No flight found");
+    return false;
+  }
 
-  const char* nodeID = object[2].begin()->key;
-  JsonArray jsonFlight = object[nodeID];
+  auto it = object.begin();
+  it += 2;
+  JsonArray values = it->value();
 
-  flight.altitude = jsonFlight[4].as<int>();
-  flight.speed = jsonFlight[5].as<int>();
-  strcpy(flight.aircraft, jsonFlight[8]);
-  strcpy(flight.reg, jsonFlight[9]);
-  strcpy(flight.from, jsonFlight[10]);
-  strcpy(flight.to, jsonFlight[11]);
-  strcpy(flight.number, jsonFlight[12]);
+  flight.altitude = values[4];
+  flight.speed = values[5];
+  strcpy(flight.aircraft, values[8]);
+  strcpy(flight.reg, values[9]);
+  strcpy(flight.from, values[11]);
+  strcpy(flight.to, values[12]);
+  strcpy(flight.number, values[13]);
 
-  Serial.printf("Downloaded flight %s from %s to %s altitude %ift speed %ikts\n", flight.number, flight.from, flight.to, flight.altitude, flight.speed); 
+  Serial.printf("Downloaded flight: %s (%s %s) from %s to %s at %ikts %ift\n", flight.number, flight.aircraft, flight.reg, flight.from, flight.to, flight.speed, flight.altitude);
+
+  return true;
 
 }
 
 void displayFlightInfo() {
 
+  display.clearDisplay();
+  display.setTextColor(myCYAN);
   
+  display.setCursor(OFFSETX,0);
+  display.print(flight.from);
+  display.setTextColor(myCYAN);
+  display.print(">");
+  
+  display.print(flight.to);
+  display.setCursor(OFFSETX,8);
+  display.setTextColor(myWHITE);
+  display.print(flight.number);
+  if(flight.altitude>10000) display.setTextColor(myGREEN);
+  else display.setTextColor(myRED);
+  display.setCursor(OFFSETX,16);
+  display.print(flight.altitude);
+  display.print("ft");
+  display.setCursor(OFFSETX,24);
+  display.setTextColor(myWHITE);
+  display.print(flight.speed);
+  display.print("kts");
+  display.setTextColor(myCYAN);
+  display.print(flight.aircraft);
 
+  display.showBuffer();
+  
  }

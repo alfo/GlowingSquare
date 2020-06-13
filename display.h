@@ -36,12 +36,31 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 // LAT=22, OE=2, A=19, B=23, C=18, D=5 (if there's an E it would be 15)
 PxMATRIX display(MATRIX_WIDTH, MATRIX_HEIGHT, 22, 2, 19, 23, 18, 5);
 
+// Some standard colors
+uint16_t myRED     = display.color565(255, 0, 0);
+uint16_t myGREEN   = display.color565(0, 255, 0);
+uint16_t myBLUE    = display.color565(0, 0, 255);
+uint16_t myWHITE   = display.color565(255, 255, 255);
+uint16_t myYELLOW  = display.color565(255, 255, 0);
+uint16_t myCYAN    = display.color565(0, 255, 255);
+uint16_t myMAGENTA = display.color565(255, 0, 255);
+uint16_t myBLACK   = display.color565(0, 0, 0);
+
 // Display writer function from the example code
 void IRAM_ATTR display_updater(){
   // Increment the counter and set the time of ISR
   portENTER_CRITICAL_ISR(&timerMux);
   display.display(DISPLAY_DRAW_TIME);
   portEXIT_CRITICAL_ISR(&timerMux);
+}
+
+void displayOffline() {
+
+  display.clearDisplay();
+  display.drawPixel(MATRIX_WIDTH - 1, MATRIX_HEIGHT - 1, display.color565(255, 0, 0));
+  display.showBuffer();
+  display.copyBuffer();
+  
 }
 
 // Function to clear all the pixels for a given row of text
@@ -57,12 +76,14 @@ void fillBlankRow(uint8_t ypos) {
   }
 }
 
+
 void drawScrollingText(uint8_t ypos, int xpos, String scrollingText, uint8_t colorR_b, uint8_t colorG_b, uint8_t colorB_b) {
   // Write the scrolling text in its current position
   display.setTextColor(display.color565(colorR_b,colorG_b,colorB_b));
   display.setCursor(xpos, ypos);
   display.println(scrollingText);
 }
+
 
 void drawStaticText(uint8_t ypos, uint16_t offset, String staticText, uint8_t colorR_a, uint8_t colorG_a, uint8_t colorB_a) {
 
@@ -150,6 +171,7 @@ void setupDisplay() {
   timerAlarmEnable(timer);
 }
 
+
 void changeBrightnessBlocking(int fadeTime) {
 
   // Calculate how far we have to fade
@@ -160,6 +182,9 @@ void changeBrightnessBlocking(int fadeTime) {
 
     // We fade at a 50Hz rate cos it makes the maths easier
     int step = change / (fadeTime / 20);
+
+    if (step == 0 && change > 0) step = 1;
+    if (step == 0 && change < 0) step = -1; 
 
     Serial.printf("Fading from %i to %i brightness in steps of %i\n", currentDisplayBrightness, targetDisplayBrightness, step);
 
@@ -191,6 +216,7 @@ void changeBrightnessBlocking(int fadeTime) {
   }
 
 }
+
 
 void changeBrightnessNonBlocking() {
 

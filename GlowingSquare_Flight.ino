@@ -38,7 +38,7 @@ int last_party_mode = party_mode;
 uint8_t targetDisplayBrightness = 255;
 uint8_t currentDisplayBrightness = 255;
 
-#define INFO_UPDATE_INTERVAL 60000
+#define INFO_UPDATE_INTERVAL 10000
 
 // Include the other sketch files
 #include "settings.h"
@@ -97,9 +97,12 @@ void loop() {
     // Only download new info every 10 seconds
     if (now - lastWebRequest > INFO_UPDATE_INTERVAL) {
   
-      downloadFlightInfo();
-      displayFlightInfo();
-  
+      if (downloadFlightInfo()) {
+        displayFlightInfo();
+      } else {
+        displayOffline();  
+      }
+      
       // Create a debug message
       lastWebRequest = now;
       
