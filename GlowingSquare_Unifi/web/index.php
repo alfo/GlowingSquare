@@ -11,13 +11,14 @@
  * see the config.template.php file for an example
  */
 require_once('config.php');
-require_once('src/Client.php');
+require_once('UnifiClient.php');
 
 function formatBytes($bytes, $precision = 2) {
     $units = array('B', 'KB', 'MB', 'GB', 'TB');
+    $short_units = array('B', 'K', 'M', 'G', 'T');
 
     $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+    $pow = floor(($bytes ? log($bytes) : 0) / log(1000));
     $pow = min($pow, count($units) - 1);
 
     // Uncomment one of the following alternatives
@@ -27,7 +28,15 @@ function formatBytes($bytes, $precision = 2) {
     // If we're using TB then allow for one more DP
     if ($pow == 4) $precision++;
 
-    return round($bytes, $precision) . $units[$pow];
+    $number = strval(round($bytes, $precision));
+
+    // We only have space for 4 digits max
+    if (strlen($number) > 2) {
+      return $number . $short_units[$pow];
+    } else {
+      return $number . $units[$pow];
+    }
+
 }
 
 /**
@@ -56,7 +65,7 @@ $out['wireless'] = 0;
 $out['wired'] = 0;
 $raw_month_tx = 0;
 $raw_month_rx = 0;
-$min_uptime = 9999999999;
+$out['min_uptime'] = 9999999999;
 
 // Count the different types of clients
 foreach ($clients as $client) {
@@ -67,9 +76,9 @@ foreach ($clients as $client) {
   if ($client->is_wired) $out['wired']++;
     else $out['wireless']++;
 
-  if ($client->uptime < $min_uptime) {
+  if ($client->uptime < $out['min_uptime']) {
     $out['newest'] = $client->hostname;
-    $min_uptime = $client->uptime;
+    $out['min_uptime'] = $client->uptime;
   }
 
 
@@ -84,8 +93,10 @@ $current_month = date('m', time());
 
 foreach ($daily_stats as $stat) {
 
+  $time = $stat->time / 1000;
+
   // Only use the data if it's from this month
-  if (date('m', $stat->time) == $current_month) {
+  if (date('m', $time) == $current_month) {
     $raw_month_tx += $stat->{'wan-tx_bytes'};
     $raw_month_rx += $stat->{'wan-rx_bytes'};
   }
