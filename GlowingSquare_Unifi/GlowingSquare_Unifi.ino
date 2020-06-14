@@ -43,6 +43,7 @@ uint8_t currentDisplayBrightness = 255;
 // Include the other sketch files
 #include "settings.h"
 #include "display.h"
+#include "icons.h"
 #include "wifi.h"
 #include "unifi.h"
 #include "animations.h"

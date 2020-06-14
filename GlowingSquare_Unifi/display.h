@@ -21,7 +21,7 @@
 // Include must go here because double_buffer muse be defined first
 #include <PxMatrix.h>
 
-// 
+//
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 
@@ -60,7 +60,7 @@ void displayOffline() {
   display.drawPixel(MATRIX_WIDTH - 1, MATRIX_HEIGHT - 1, display.color565(255, 0, 0));
   display.showBuffer();
   display.copyBuffer();
-  
+
 }
 
 // Function to clear all the pixels for a given row of text
@@ -69,9 +69,9 @@ void displayOffline() {
 void fillBlankRow(uint8_t ypos) {
 
   // Clear only the pixels on this part of the display
-  for (int x = 0; x < MATRIX_WIDTH; x++) {  
-    for (int y = ypos; y < ypos + 8; y++) {      
-      display.drawPixel(x, y, display.color565(0, 0, 0 ));    
+  for (int x = 0; x < MATRIX_WIDTH; x++) {
+    for (int y = ypos; y < ypos + 8; y++) {
+      display.drawPixel(x, y, display.color565(0, 0, 0 ));
     }
   }
 }
@@ -98,6 +98,18 @@ void drawStaticText(uint8_t ypos, uint16_t offset, String staticText, uint8_t co
   display.setCursor(0, ypos);
   display.setTextColor(display.color565(colorR_a,colorG_a,colorB_a));
   display.println(staticText);
+
+}
+
+void drawRightAlignedText(uint8_t xpos, uint8_t ypos, String text) {
+
+  uint8_t characterWidth = 5;
+  uint16_t textLength = text.length();
+
+  uint16_t offset = xpos - textLength * (characterWidth + 1);
+
+  display.setCursor(offset, ypos);
+  display.print(text);
   
 }
 
@@ -144,7 +156,7 @@ void drawStaticAndScrollingText(uint8_t ypos, unsigned long scroll_delay, String
   // Send the final line to the display
   display.showBuffer();
   display.copyBuffer();
-    
+
 }
 
 
@@ -184,7 +196,7 @@ void changeBrightnessBlocking(int fadeTime) {
     int step = change / (fadeTime / 20);
 
     if (step == 0 && change > 0) step = 1;
-    if (step == 0 && change < 0) step = -1; 
+    if (step == 0 && change < 0) step = -1;
 
     Serial.printf("Fading from %i to %i brightness in steps of %i\n", currentDisplayBrightness, targetDisplayBrightness, step);
 
@@ -205,7 +217,7 @@ void changeBrightnessBlocking(int fadeTime) {
         currentDisplayBrightness = targetDisplayBrightness;
         display.setBrightness(currentDisplayBrightness);
       }
-      
+
     }
 
     // Mark the fade as having completed
@@ -231,7 +243,24 @@ void changeBrightnessNonBlocking() {
     }
 
     display.setBrightness(currentDisplayBrightness);
-    
+
   }
+
+}
+
+void drawIcon(int x, int y, int width, int height, const uint16_t image[]) {
+
+//uint16_t * buffer = new uint16_t[2048];
+  //memcpy_P(buffer, image, 2048);
+
+  int counter = 0;
+  for (int yy = 0; yy < height; yy++) {
+    for (int xx = 0; xx < width; xx++) {
+      display.drawPixel(xx + x , yy + y, image[counter]);
+      counter++;
+    }
+  }
+
+  //free(buffer);
 
 }
