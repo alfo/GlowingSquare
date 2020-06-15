@@ -73,6 +73,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     last_party_mode = party_mode;
   }
 
+  Serial.println("Finished fetching MQTT messages");
+
 }
 
 boolean mqttConnect() {

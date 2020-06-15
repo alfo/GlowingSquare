@@ -15,17 +15,18 @@
  */
 
 boolean offline = false;
-#define URL "http://10.0.1.145:8080/"
 #define GRAPH_HEIGHT 8
 
 // Function that runs from loop() every 30 seconds
 boolean downloadAndDisplayNetworkInfo() {
 
+  Serial.println("Fetching info...");
+
   HTTPClient http;
 
   // This is the API endpoint that we fetch new departures for our station from
   char requestURL[256];  
-  sprintf(requestURL, "%s?width=%i&height=%i", URL, MATRIX_WIDTH, GRAPH_HEIGHT);
+  sprintf(requestURL, "%s?width=%i&height=%i", script_url, MATRIX_WIDTH, GRAPH_HEIGHT);
 
   // Fetch the data from the server
   http.begin(requestURL);
@@ -49,9 +50,6 @@ boolean downloadAndDisplayNetworkInfo() {
 
   StaticJsonDocument<2048> json;
   deserializeJson(json, payload);
-
-  
-  serializeJsonPretty(json, Serial);
 
   display.clearDisplay();
   display.setTextColor(display.color565(250, 88, 12));
@@ -90,8 +88,9 @@ boolean downloadAndDisplayNetworkInfo() {
   } else {
     fillBlankRow(16);
   }
-  
 
   display.showBuffer();
+
+  Serial.printf("Finished, %s down %s up", json["month_rx"].as<String>(), json["month_tx"].as<String>());
   
  }
