@@ -98,8 +98,10 @@ void loop() {
     // Only download new info every 10 seconds
     if (now - lastWebRequest > INFO_UPDATE_INTERVAL) {
 
-  
-      if (!downloadAndDisplayNetworkInfo()) {
+      downloadAndDisplayNetworkInfo();
+
+      // Only display as offline if we've had 3 failed web requests in a row
+      if (failed_attempts > 2) {
         displayOffline();  
       }
       

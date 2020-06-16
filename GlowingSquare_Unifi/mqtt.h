@@ -51,7 +51,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       Serial.println("^^^ Mode change: No party");
       party_mode = 0;
     }
-    
+
   }
 
   if (strcmp(topic, inTopic) == 0) {
@@ -59,9 +59,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     if (json["brightness"] || json["brightness"] == 0) {
 
       targetDisplayBrightness = json["brightness"].as<int>();
-      
+
     }
-    
+
   }
 
   // This clears the display if we're changing display modes
@@ -72,8 +72,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     display.showBuffer();
     last_party_mode = party_mode;
   }
-
-  Serial.println("Finished fetching MQTT messages");
 
 }
 
@@ -120,7 +118,7 @@ void mqttLoop() {
 
     // Has it been 5 seconds since we last tried to connect
     if (now - lastMQTTReconnectAttempt > 5000) {
-  
+
       lastMQTTReconnectAttempt = now;
 
       // If successful, reset the counters
@@ -134,7 +132,7 @@ void mqttLoop() {
     // We are connected
     // Check for incoming messages
     mqttClient.loop();
-    
+
   }
 
 }
@@ -144,10 +142,10 @@ void mqttLoop() {
 void setupMQTT() {
 
   char deviceID[40];
-  
+
   #ifdef MQTT_NAME
     strcpy(deviceID, MQTT_NAME);
-  #else 
+  #else
     strcpy(deviceID, hostname);
   #endif
 
