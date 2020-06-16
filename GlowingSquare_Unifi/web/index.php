@@ -70,9 +70,9 @@ $out['min_uptime'] = 9999999999;
 // Count the different types of clients
 foreach ($clients as $client) {
 
-  $out['clients']++;
-
   if ($client->is_guest) $out['guests']++;
+    else $out['clients']++;
+
   if ($client->is_wired) $out['wired']++;
     else $out['wireless']++;
 
