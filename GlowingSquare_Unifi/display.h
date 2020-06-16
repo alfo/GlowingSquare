@@ -54,6 +54,8 @@ void IRAM_ATTR display_updater(){
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
+// Draw a red pixel at the bottom of the display if we're
+// offline, to show power is still on etc.
 void displayOffline() {
 
   display.clearDisplay();

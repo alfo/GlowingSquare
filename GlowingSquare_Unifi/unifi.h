@@ -14,8 +14,11 @@
  *
  */
 
-int failed_attempts = 0;
+// How tall we want the graph on the display to be
 #define GRAPH_HEIGHT 8
+
+// Keep track of any failed web requests
+int failed_attempts = 0;
 
 // Function that runs from loop() every 30 seconds
 boolean downloadAndDisplayNetworkInfo() {

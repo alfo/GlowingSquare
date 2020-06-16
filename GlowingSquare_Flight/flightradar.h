@@ -17,7 +17,8 @@
 #define AREA "51.5672,51.4131,-0.4146,0.1107"
 #define OFFSETX 0
 
-boolean offline = false;
+// Keep track of any failed web requests
+int failed_attempts = 0;
 
 // Struct to store the information about the downloaded flight
 struct Flight {
@@ -51,12 +52,12 @@ boolean downloadFlightInfo() {
     Serial.printf("Failed to get info with HTTP Code %i\n", httpCode); // Code -11 means the request timed out
 
     // Mark us as offline so the little icon will be drawn next time
-    offline = true;
+    failed_attempts++;
+    return false;
 
   } else {
-
     // All is good
-    offline = false;
+    failed_attempts = 0;
   }
 
   String payload = http.getString();

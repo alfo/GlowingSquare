@@ -11,7 +11,7 @@
  Glowing Square: Tube Display               |___/
  For ESP32
  tubeapi.h
- * 
+ *
  */
 
 #define TFL_APP_ID "5ee457fb"
@@ -34,8 +34,8 @@ struct Departure {
 // This is what we'll store the processed departures in
 std::vector<Departure> departures;
 
-// Keep track of whether our last request failed
-boolean offline = true;
+// Keep track of any failed web requests
+int failed_attempts = 0;
 
 // Function that runs from loop() every 60 seconds
 int downloadTubeInfo() {
@@ -43,7 +43,7 @@ int downloadTubeInfo() {
   HTTPClient http;
 
   // This is the API endpoint that we fetch new departures for our station from
-  char requestURL[256];  
+  char requestURL[256];
   sprintf(requestURL, "https://api.tfl.gov.uk/Line/%s/Arrivals/%s?direction=%s&app_key=%s&app_id=%s", tfl_route, tfl_station_id, tfl_direction, TFL_APP_KEY, TFL_APP_ID);
 
   // Fetch the data from the server
@@ -51,20 +51,20 @@ int downloadTubeInfo() {
   int httpCode = http.GET();
 
   // Check that the server gave a valid response
+  // Check that the server gave a valid response
   if (httpCode != 200) {
     Serial.printf("Failed to get info with HTTP Code %i\n", httpCode); // Code -11 means the request timed out
-    
-    // Mark us as offline so the little icon will be drawn next time
-    offline = true;
-    return false;
-    
-  } else {
 
+    // Mark us as offline so the little icon will be drawn next time
+    failed_attempts++;
+    return false;
+
+  } else {
     // All is good
-    offline = false;
+    failed_attempts = 0;
   }
 
-  
+
   String payload = http.getString();
 
   if (payload.length() == 0) {
@@ -84,7 +84,7 @@ int downloadTubeInfo() {
    * to only process the data we're interested in.
    * In this case that's the below parameters:
    */
-   
+
   StaticJsonDocument<160> filter;
   filter[0]["lineName"] = true;
   filter[0]["platformName"] = true;
@@ -144,7 +144,7 @@ void displayTubeInfo() {
 
     // Wait before doign the next one
     delay(1000);
-    
+
   }
 
  }
