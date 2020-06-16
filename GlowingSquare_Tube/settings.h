@@ -11,19 +11,19 @@
  Glowing Square: Tube Display               |___/
  For ESP32
  settings.h
- * 
+ *
  */
- 
+
 // Default values for config common to all projects
-char hostname[24] = "ESP Project";
+char hostname[24] = "glowingsquare_tube";
 char mqtt_server[40];
 char mqtt_port[6]  = "1883";
 char mqtt_username[40];
 char mqtt_password[40];
+char room[30] = "living_room";
 char tfl_station_id[24] = "940GZZLUACY";
 char tfl_route[24] = "northern";
 char tfl_direction[8] = "inbound";
-
 
 // Default custom static IP (not always used)
 char static_ip[16] = "10.0.3.255";
@@ -64,7 +64,7 @@ void setupStorage(){
         configFile.readBytes(buf.get(), size);
         StaticJsonDocument<256> json;
         DeserializationError jsonError = deserializeJson(json, buf.get());
-  
+
         serializeJsonPretty(json, Serial);
         if (!jsonError) {
           Serial.println("\nparsed json");
@@ -74,10 +74,11 @@ void setupStorage(){
           strcpy(mqtt_port, json["mqtt_port"]);
           strcpy(mqtt_username, json["mqtt_username"]);
           strcpy(mqtt_password, json["mqtt_password"]);
+          strcpy(room, json["room"]);
           strcpy(tfl_station_id, json["tfl_station_id"]);
           strcpy(tfl_route, json["tfl_route"]);
           strcpy(tfl_direction, json["tfl_direction"]);
-          
+
 
 //           if(json["ip"]) {
 //             Serial.println("setting custom ip from config");
@@ -102,13 +103,14 @@ void setupStorage(){
 
 void saveConfig() {
   Serial.println("saving config");
-  
+
   StaticJsonDocument<256> json;
   json["mqtt_server"]    = mqtt_server;
   json["mqtt_port"]      = mqtt_port;
   json["mqtt_username"]  = mqtt_username;
   json["mqtt_password"]  = mqtt_password;
   json["hostname"]       = hostname;
+  json["room"]           = room;
   json["tfl_station_id"] = tfl_station_id;
   json["tfl_route"]      = tfl_route;
   json["tfl_direction"]  = tfl_direction;
@@ -123,7 +125,7 @@ void saveConfig() {
   }
 
   serializeJsonPretty(json, Serial);
-  
+
   serializeJson(json, configFile);
   configFile.close();
   //end save

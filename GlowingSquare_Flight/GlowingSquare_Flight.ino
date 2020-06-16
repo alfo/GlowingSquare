@@ -31,8 +31,6 @@
 // Uncomment to reset device memory (useful to fix corruption / force new settings)
 //#define START_ANEW
 
-// Which room in the house is this project
-char room[30] = "living_room";
 int party_mode = 0; // 0 = off, 1 = chill, 2 = party
 int last_party_mode = party_mode;
 uint8_t targetDisplayBrightness = 255;

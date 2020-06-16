@@ -8,7 +8,7 @@
   / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
  /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
                                              __/ |
- Glowing Square: Unifi Display              |___/ 
+ Glowing Square: Unifi Display              |___/
  For ESP32
  wifi.h
  *
@@ -53,8 +53,10 @@ void startWiFiManagerWithParameters() {
   WiFiManagerParameter custom_mqtt_port("port", "MQTT Port", mqtt_port, 6);
   WiFiManagerParameter custom_mqtt_username("username", "MQTT Username", mqtt_username, 32);
   WiFiManagerParameter custom_mqtt_password("password", "MQTT Password", mqtt_password, 32);
+  WiFiManagerParameter custom_room("room", "Room Name", room, 30);
   WiFiManagerParameter custom_script_url("script_url", "Script URL", script_url, 50);
   wm.addParameter(&custom_hostname);
+  wm.addParameter(&custom_room);
   wm.addParameter(&custom_mqtt_server);
   wm.addParameter(&custom_mqtt_port);
   wm.addParameter(&custom_mqtt_username);
@@ -80,13 +82,12 @@ void startWiFiManagerWithParameters() {
     delay(5000);
   }
 
-
-
   // Keeping this line cos it's cute
   Serial.println("Connected ...yeey :)");
 
   // Update parameters from the new values set in the portal
   strcpy(hostname, custom_hostname.getValue());
+  strcpy(room, custom_room.getValue());
   strcpy(mqtt_server, custom_mqtt_server.getValue());
   strcpy(mqtt_port, custom_mqtt_port.getValue());
   strcpy(mqtt_username, custom_mqtt_username.getValue());

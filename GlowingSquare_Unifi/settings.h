@@ -15,14 +15,13 @@
  */
 
 // Default values for config common to all projects
-char hostname[24] = "ESP Project";
+char hostname[24] = "glowingsquare_unifi";
 char script_url[50] = "http://10.0.1.145:8080/";
+char room[30] = "living_room";
 char mqtt_server[40];
 char mqtt_port[6] = "1883";
 char mqtt_username[40];
 char mqtt_password[40];
-
-
 
 // Default custom static IP (not always used)
 char static_ip[16] = "10.0.3.255";
@@ -69,6 +68,7 @@ void setupStorage(){
           Serial.println("\nparsed json");
 
           strcpy(hostname, json["hostname"]);
+          strcpy(room, json["room"]);
           strcpy(mqtt_server, json["mqtt_server"]);
           strcpy(mqtt_port, json["mqtt_port"]);
           strcpy(mqtt_username, json["mqtt_username"]);
@@ -106,6 +106,7 @@ void saveConfig() {
   json["mqtt_username"]  = mqtt_username;
   json["mqtt_password"]  = mqtt_password;
   json["hostname"]       = hostname;
+  json["room"]           = room;
   json["script_url"]     = script_url;
 
   // json["ip"]          = WiFi.localIP().toString();
