@@ -81,7 +81,6 @@ foreach ($clients as $client) {
     $out['min_uptime'] = $client->uptime;
   }
 
-
 }
 
 /*
