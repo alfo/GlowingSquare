@@ -8,12 +8,12 @@
   / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
  /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
                                              __/ |
- Glowing Square: Flight Display             |___/
+ Glowing Square: Unifi Display              |___/
  For ESP32
  settings.h
- * 
+ *
  */
- 
+
 // Default values for config common to all projects
 char hostname[24] = "ESP Project";
 char script_url[50] = "http://10.0.1.145:8080/";
@@ -63,7 +63,7 @@ void setupStorage(){
         configFile.readBytes(buf.get(), size);
         StaticJsonDocument<256> json;
         DeserializationError jsonError = deserializeJson(json, buf.get());
-  
+
         serializeJsonPretty(json, Serial);
         if (!jsonError) {
           Serial.println("\nparsed json");
@@ -74,7 +74,7 @@ void setupStorage(){
           strcpy(mqtt_username, json["mqtt_username"]);
           strcpy(mqtt_password, json["mqtt_password"]);
           strcpy(script_url, json["script_url"]);
-          
+
 
 //           if(json["ip"]) {
 //             Serial.println("setting custom ip from config");
@@ -99,7 +99,7 @@ void setupStorage(){
 
 void saveConfig() {
   Serial.println("saving config");
-  
+
   StaticJsonDocument<256> json;
   json["mqtt_server"]    = mqtt_server;
   json["mqtt_port"]      = mqtt_port;
@@ -118,7 +118,7 @@ void saveConfig() {
   }
 
   serializeJsonPretty(json, Serial);
-  
+
   serializeJson(json, configFile);
   configFile.close();
   //end save

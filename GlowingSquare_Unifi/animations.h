@@ -8,7 +8,7 @@
   / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
  /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
                                              __/ |
- Glowing Square: Flight Display             |___/
+ Glowing Square: Unifi Display              |___/
  For ESP32
  animations.h
  *

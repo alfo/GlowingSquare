@@ -8,9 +8,9 @@
   / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
  /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
                                              __/ |
- Glowing Square: Flight Display             |___/
+ Glowing Square: Unifi Display              |___/
  For ESP32
- GlowingSquare_Flight.ino
+ GlowingSquare_Unifi.ino
  *
  */
 
@@ -20,7 +20,7 @@
 #include <ArduinoJson.h>   // https://github.com/bblanchon/ArduinoJson ~v6.x.x
 #include <PubSubClient.h>  // https://github.com/knolleary/pubsubclient ~v2.7.0
 #include <ArduinoOTA.h>    // Included with core
-#include <HTTPClient.h>    // To fetch data 
+#include <HTTPClient.h>    // To fetch data
                            // PxMatrix is included from inside the display.h file
 #include <FastLED.h>       // For the animations during party mode
 
@@ -54,7 +54,7 @@ void setup() {
   // Start serial
   Serial.begin(115200);
   Serial.println();
-  
+
   // Load config from the file system
   setupStorage();
 
@@ -102,23 +102,23 @@ void loop() {
 
       // Only display as offline if we've had 3 failed web requests in a row
       if (failed_attempts > 2) {
-        displayOffline();  
+        displayOffline();
       }
-      
+
       // Create a debug message
       lastWebRequest = now;
-      
+
     }
-    
+
   } else {
 
     // Use a non-blocking fade so the animation can continue
-    // smoothly as we fade 
+    // smoothly as we fade
     changeBrightnessNonBlocking();
 
     // Draw the next frame of our patterns
     patternLoop();
-    
+
   }
 
 }

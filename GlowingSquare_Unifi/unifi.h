@@ -8,9 +8,9 @@
   / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
  /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
                                              __/ |
- Glowing Square: Flight Display             |___/
+ Glowing Square: Unifi Display              |___/
  For ESP32
- tubeapi.h
+ unifi.h
  *
  */
 
@@ -45,6 +45,7 @@ boolean downloadAndDisplayNetworkInfo() {
     failed_attempts = 0;
   }
 
+  // Fetch and parse the web request
   String payload = http.getString();
 
   StaticJsonDocument<2048> json;
@@ -70,8 +71,10 @@ boolean downloadAndDisplayNetworkInfo() {
   display.setTextColor(display.color565(247, 20, 12));
   display.print(json["clients"].as<int>());
 
+  // Calculate where the guest icon and text needs to go
   int next_x = 14 + json["clients"].as<String>().length() * 5;
 
+  // Draw the guest icon and stats
   drawIcon(next_x, 8, 7, 7, guest_icon);
   display.setCursor(next_x + 8, 8);
   display.print(json["guests"].as<int>());

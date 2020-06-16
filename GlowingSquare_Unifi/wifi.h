@@ -8,10 +8,10 @@
   / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
  /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
                                              __/ |
- Glowing Square: Flight Display             |___/
+ Glowing Square: Unifi Display              |___/ 
  For ESP32
  wifi.h
- * 
+ *
  */
 
 const unsigned long CONNECT_TIMEOUT = 30; // How long to attempt to connect to saved WiFi before going into AP mode
@@ -46,7 +46,7 @@ void startWiFiManagerWithParameters() {
 
   // Set hostname from settings
   wm.setHostname(hostname);
-  
+
   // WiFiManager custom config
   WiFiManagerParameter custom_hostname("hostname", "Hostname", hostname, 24);
   WiFiManagerParameter custom_mqtt_server("server", "MQTT Server", mqtt_server, 40);
@@ -60,7 +60,7 @@ void startWiFiManagerWithParameters() {
   wm.addParameter(&custom_mqtt_username);
   wm.addParameter(&custom_mqtt_password);
   wm.addParameter(&custom_script_url);
-  
+
   //reset settings - wipe credentials for testing, if defined
   #if defined(START_ANEW)
     Serial.println("^^^^^^^^ Clearing WiFi credentials");
@@ -71,7 +71,7 @@ void startWiFiManagerWithParameters() {
   if (!wm.autoConnect(hostname, "password")) {
 
     // If we've hit the config portal timeout, then retstart
-    
+
     Serial.println("%%% Failed to connect and hit timeout, restarting");
     delay(100);
     ESP.restart();
@@ -80,11 +80,11 @@ void startWiFiManagerWithParameters() {
     delay(5000);
   }
 
-  
+
 
   // Keeping this line cos it's cute
   Serial.println("Connected ...yeey :)");
-  
+
   // Update parameters from the new values set in the portal
   strcpy(hostname, custom_hostname.getValue());
   strcpy(mqtt_server, custom_mqtt_server.getValue());
@@ -92,7 +92,7 @@ void startWiFiManagerWithParameters() {
   strcpy(mqtt_username, custom_mqtt_username.getValue());
   strcpy(mqtt_password, custom_mqtt_password.getValue());
   strcpy(script_url, custom_script_url.getValue());
-  
+
   if (shouldSaveConfig) {
     saveConfig();
   }

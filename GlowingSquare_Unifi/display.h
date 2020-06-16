@@ -8,7 +8,7 @@
   / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
  /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
                                              __/ |
- Glowing Square: Flight Display             |___/
+ Glowing Square: Unifi Display              |___/
  For ESP32
  display.h
  *
@@ -110,7 +110,7 @@ void drawRightAlignedText(uint8_t xpos, uint8_t ypos, String text) {
 
   display.setCursor(offset, ypos);
   display.print(text);
-  
+
 }
 
 void drawStaticAndScrollingText(uint8_t ypos, unsigned long scroll_delay, String staticText, String scrollingText, uint8_t colorR_a, uint8_t colorG_a, uint8_t colorB_a, uint8_t colorR_b, uint8_t colorG_b, uint8_t colorB_b) {

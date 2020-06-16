@@ -1,15 +1,20 @@
 <?php
-/**
- * PHP API usage example
+/*
  *
- * contributed by: @gahujipo
- * description: example to pull connected users and their details from the UniFi controller and output the results
- *              in JSON format
+ *
+ *         _             ______
+     /\   | |           |  ____|
+    /  \  | | _____  __ | |__ ___  _ __ ___ _   _
+   / /\ \ | |/ _ \ \/ / |  __/ _ \| '__/ _ \ | | |
+  / ____ \| |  __/>  <  | | | (_) | | |  __/ |_| |
+ /_/    \_\_|\___/_/\_\ |_|  \___/|_|  \___|\__, |
+                                             __/ |
+ Glowing Square: Unifi Display              |___/
+ For PHP web server
+ index.php
+ *
  */
-/**
- * include the config file (place your credentials etc there if not already present)
- * see the config.template.php file for an example
- */
+
 require_once('config.php');
 require_once('UnifiClient.php');
 
@@ -92,6 +97,7 @@ $current_month = date('m', time());
 
 foreach ($daily_stats as $stat) {
 
+  // The time is provided in ms, annoyingly
   $time = $stat->time / 1000;
 
   // Only use the data if it's from this month
@@ -116,8 +122,9 @@ $graph_width = $_GET['width'];
 $graph_height = $_GET['height'];
 
 
-// This is based on some status from my house
-$max_graph = 300000000;
+// The value that represents 100% height on the graph to begin with
+// based on my house's maximum use per 5 min (ish)
+$max_graph = 350000000;
 
 // Use the last 100 datapoints to figure out the max height of the graph
 $n = 100;
@@ -134,10 +141,8 @@ foreach (array_slice($minute_stats, -$graph_width, $graph_width) as $stat) {
 
 }
 
-
-/**
- * output the results in JSON format
- */
+/*
+  Output the data with the correct headers
+*/
 header('Content-Type: application/json; charset=utf-8');
-//echo json_encode($clients, JSON_PRETTY_PRINT);
 echo json_encode($out);

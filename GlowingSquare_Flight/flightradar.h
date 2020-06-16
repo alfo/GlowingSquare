@@ -10,8 +10,8 @@
                                              __/ |
  Glowing Square: Flight Display             |___/
  For ESP32
- tubeapi.h
- * 
+ flightradar.h
+ *
  */
 
 #define AREA "51.5672,51.4131,-0.4146,0.1107"
@@ -39,7 +39,7 @@ boolean downloadFlightInfo() {
   HTTPClient http;
 
   // This is the API endpoint that we fetch new departures for our station from
-  char requestURL[256];  
+  char requestURL[256];
   sprintf(requestURL, "http://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=%s&faa=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=0&maxage=14400&gliders=0&stats=0&ems=1&limit=1", AREA);
 
   // Fetch the data from the server
@@ -49,10 +49,10 @@ boolean downloadFlightInfo() {
   // Check that the server gave a valid response
   if (httpCode != 200) {
     Serial.printf("Failed to get info with HTTP Code %i\n", httpCode); // Code -11 means the request timed out
-    
+
     // Mark us as offline so the little icon will be drawn next time
     offline = true;
-    
+
   } else {
 
     // All is good
@@ -65,7 +65,7 @@ boolean downloadFlightInfo() {
   deserializeJson(json, payload);
 
   JsonObject object = json.as<JsonObject>();
-  
+
   if (object.size() < 3) {
     Serial.println("No flight found");
     return false;
@@ -93,12 +93,12 @@ void displayFlightInfo() {
 
   display.clearDisplay();
   display.setTextColor(myCYAN);
-  
+
   display.setCursor(OFFSETX,0);
   display.print(flight.from);
   display.setTextColor(myCYAN);
   display.print(">");
-  
+
   display.print(flight.to);
   display.setCursor(OFFSETX,8);
   display.setTextColor(myWHITE);
@@ -116,5 +116,5 @@ void displayFlightInfo() {
   display.print(flight.aircraft);
 
   display.showBuffer();
-  
+
  }
