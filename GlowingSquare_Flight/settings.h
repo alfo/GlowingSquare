@@ -11,18 +11,16 @@
  Glowing Square: Flight Display             |___/
  For ESP32
  settings.h
- * 
+ *
  */
- 
+
 // Default values for config common to all projects
 char hostname[24] = "ESP Project";
 char mqtt_server[40];
 char mqtt_port[6]  = "1883";
 char mqtt_username[40];
 char mqtt_password[40];
-char tfl_station_id[24] = "940GZZLUACY";
-char tfl_route[24] = "northern";
-char tfl_direction[8] = "inbound";
+char flight_area[36] = "51.5672,51.4131,-0.4146,0.1107";
 
 
 // Default custom static IP (not always used)
@@ -64,7 +62,7 @@ void setupStorage(){
         configFile.readBytes(buf.get(), size);
         StaticJsonDocument<256> json;
         DeserializationError jsonError = deserializeJson(json, buf.get());
-  
+
         serializeJsonPretty(json, Serial);
         if (!jsonError) {
           Serial.println("\nparsed json");
@@ -74,10 +72,8 @@ void setupStorage(){
           strcpy(mqtt_port, json["mqtt_port"]);
           strcpy(mqtt_username, json["mqtt_username"]);
           strcpy(mqtt_password, json["mqtt_password"]);
-          strcpy(tfl_station_id, json["tfl_station_id"]);
-          strcpy(tfl_route, json["tfl_route"]);
-          strcpy(tfl_direction, json["tfl_direction"]);
-          
+          strcpy(flight_area, json["flight_area"]);
+
 
 //           if(json["ip"]) {
 //             Serial.println("setting custom ip from config");
@@ -102,16 +98,14 @@ void setupStorage(){
 
 void saveConfig() {
   Serial.println("saving config");
-  
+
   StaticJsonDocument<256> json;
   json["mqtt_server"]    = mqtt_server;
   json["mqtt_port"]      = mqtt_port;
   json["mqtt_username"]  = mqtt_username;
   json["mqtt_password"]  = mqtt_password;
   json["hostname"]       = hostname;
-  json["tfl_station_id"] = tfl_station_id;
-  json["tfl_route"]      = tfl_route;
-  json["tfl_direction"]  = tfl_direction;
+  json["flight_area"]    = flight_area;
 
   // json["ip"]          = WiFi.localIP().toString();
   // json["gateway"]     = WiFi.gatewayIP().toString();
@@ -123,7 +117,7 @@ void saveConfig() {
   }
 
   serializeJsonPretty(json, Serial);
-  
+
   serializeJson(json, configFile);
   configFile.close();
   //end save
