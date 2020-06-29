@@ -19,23 +19,27 @@ require_once('config.php');
 require_once('UnifiClient.php');
 
 function formatBytes($bytes, $precision = 2) {
+
+    // Round to the nearest byte
+    $bytes = round($bytes, 0);
+
     $units = array('B', 'KB', 'MB', 'GB', 'TB');
     $short_units = array('B', 'K', 'M', 'G', 'T');
 
+    // Don't allow minus bytes
     $bytes = max($bytes, 0);
     $pow = floor(($bytes ? log($bytes) : 0) / log(1000));
     $pow = min($pow, count($units) - 1);
 
-    // Uncomment one of the following alternatives
-    // $bytes /= pow(1024, $pow);
-    $bytes /= (1 << (10 * $pow));
+    // Adjust the bytes to MB, GB, etc
+    $bytes /= pow(1000, $pow);
 
     // If we're using TB then allow for one more DP
-    if ($pow == 4) $precision++;
+    if ($pow == 4) $precision += 1;
 
-    $number = strval(round($bytes, $precision));
+    // Format it to the correct dp
+    $number = number_format($bytes, $precision);
 
-    // We only have space for 4 digits max
     if (strlen($number) > 2) {
       return $number . $short_units[$pow];
     } else {
