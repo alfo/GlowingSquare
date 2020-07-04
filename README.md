@@ -6,6 +6,8 @@ I have made three displays so far: one that shows the current London Tube depart
 
 ![Photo](https://i.imgur.com/ZX31npw.jpg)
 
+Full photo album [here](https://imgur.com/a/xTvUx8F).
+
 ## Features
 
 * Fetches JSON data from an API at a given interval
