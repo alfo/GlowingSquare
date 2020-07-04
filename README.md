@@ -25,6 +25,10 @@ I have made three displays so far: one that shows the current London Tube depart
 
 You can just use a 5V power supply instead, but 100W+ ones tend to have loud fans in them, which is annoying, whereas my 24V 120W PSU is completely silent. It also helps with voltage drop if you're using long cables.
 
+## Enclosure
+
+See the files in the Enclosure folder for the STLs of the two 3D-printed parts of this project, as well as the full Fusion 360 model showing you how it all fits together and what wood is required for the project.
+
 ![Back view](https://i.imgur.com/OPJ0tCZ.jpg)
 
 ## Global Config Options
@@ -72,10 +76,6 @@ Install the `GlowingSquare/Unifi/web/` files on your PHP server, and rename the 
 Config Options:
 
 * Script URL as set up above, e.g. `http://10.0.1.9/glowingsquare/?width=64`
-
-## Enclosure
-
-See the files in the Enclosure folder for the STLs of the two 3D-printed parts of this project, as well as the full Fusion 360 model showing you how it all fits together and what wood is required for the project.
 
 ## Other Notes
 
