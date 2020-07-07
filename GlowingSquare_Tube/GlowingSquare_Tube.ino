@@ -92,8 +92,8 @@ void loop() {
     // actual displaying of info is blocking too
     changeBrightnessBlocking(3000);
 
-    // Only download new info every 10 seconds
-    if (now - lastWebRequest > INFO_UPDATE_INTERVAL) {
+    // Only download new info every sp often, and don't bother if display is off
+    if (now - lastWebRequest > INFO_UPDATE_INTERVAL && currentDisplayBrightness != 0) {
 
       downloadTubeInfo();
 

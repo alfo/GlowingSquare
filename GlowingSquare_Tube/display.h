@@ -44,7 +44,7 @@ void IRAM_ATTR display_updater(){
   portEXIT_CRITICAL_ISR(&timerMux);
 }
 
-// Draw a red pixel at the bottom of the display if we're
+// Draw a red pixel at the bottom right of the display if we're
 // offline, to show power is still on etc.
 void displayOffline() {
 
@@ -53,6 +53,14 @@ void displayOffline() {
   display.showBuffer();
   display.copyBuffer();
 
+}
+
+// Remove the red pixel at the bottom right of the display
+// because things are working now again
+void displayOnline() {
+  display.drawPixel(MATRIX_WIDTH - 1, MATRIX_HEIGHT - 1, display.color565(0, 0, 0));
+  display.showBuffer();
+  display.copyBuffer();
 }
 
 // Function to clear all the pixels for a given row of text
@@ -171,6 +179,10 @@ void changeBrightnessBlocking(int fadeTime) {
 
     // We fade at a 50Hz rate cos it makes the maths easier
     int step = change / (fadeTime / 20);
+
+    // Prevent forever loops with 0 step
+    if (step == 0 && change > 0) step = 1;
+    if (step == 0 && change < 0) step = -1;
 
     Serial.printf("Fading from %i to %i brightness in steps of %i\n", currentDisplayBrightness, targetDisplayBrightness, step);
 

@@ -197,6 +197,7 @@ void changeBrightnessBlocking(int fadeTime) {
     // We fade at a 50Hz rate cos it makes the maths easier
     int step = change / (fadeTime / 20);
 
+    // Prevent forever loops with 0 step
     if (step == 0 && change > 0) step = 1;
     if (step == 0 && change < 0) step = -1;
 

@@ -14,8 +14,8 @@
  *
  */
 
-#define TFL_APP_ID "5ee457fb"
-#define TFL_APP_KEY "7bb4c9392c555bc1332b85f1714c2acf"
+// Include our TfL credentials
+#include "secret.h"
 
 // The TfL Station ID is saved into config, comes from here: https://api.tfl.gov.uk/swagger/ui/index.html?url=/swagger/docs/v1#!/StopPoint/StopPoint_Search
 // The TfL Route is saved into config, test it out here: https://api.tfl.gov.uk/swagger/ui/index.html?url=/swagger/docs/v1#!/Line/Line_Arrivals
@@ -40,7 +40,11 @@ int failed_attempts = 0;
 // Function that runs from loop() every 60 seconds
 int downloadTubeInfo() {
 
+  Serial.print("Fetching info from Tfl... ");
+
   HTTPClient http;
+
+  long start = millis();
 
   // This is the API endpoint that we fetch new departures for our station from
   char requestURL[256];
@@ -49,6 +53,8 @@ int downloadTubeInfo() {
   // Fetch the data from the server
   http.begin(requestURL);
   int httpCode = http.GET();
+
+  Serial.printf("took %ims... ", millis() - start);
 
   // Check that the server gave a valid response
   // Check that the server gave a valid response
@@ -61,6 +67,9 @@ int downloadTubeInfo() {
 
   } else {
     // All is good
+    if (failed_attempts > 0)
+      displayOnline();
+
     failed_attempts = 0;
   }
 
@@ -72,10 +81,15 @@ int downloadTubeInfo() {
     // Sometimes there will just be no departures, cos the station is closed etc.
     Serial.println("No data received from TfL");
     return false;
+  } else {
+    Serial.printf("Got data of length %i\n", payload.length());
   }
 
   // Close the HTTPClient to free memory
   http.end();
+
+  // Remove the previous departures
+  departures.clear();
 
   /*
    * Because the JSON response from TfL can be and absolute chonker sometimes
@@ -84,20 +98,16 @@ int downloadTubeInfo() {
    * to only process the data we're interested in.
    * In this case that's the below parameters:
    */
-
   StaticJsonDocument<160> filter;
   filter[0]["lineName"] = true;
   filter[0]["platformName"] = true;
-  filter[0]["currentLocation"] = true;
+  // filter[0]["currentLocation"] = true; // if you want to know where exactly the train is
   filter[0]["timeToStation"] = true;
   filter[0]["towards"] = true;
 
   // It's a chonky JSON document
   StaticJsonDocument<2048> json;
   deserializeJson(json, payload, DeserializationOption::Filter(filter));
-
-  // Remove the previous departures
-  departures.clear();
 
   // Loop over the returned entries and insert them into the vector list
   for (JsonVariantConst v : json.as<JsonArray>()) {
@@ -126,6 +136,9 @@ void displayTubeInfo() {
       break;
     }
 
+    Serial.print("%%%");
+    Serial.println(departures[i].towards);
+
     // Convert seconds to minutes and format it nicely
     char formattedMins[10];
     sprintf(formattedMins, "%im", departures[i].timeToStation / 60);
@@ -140,9 +153,9 @@ void displayTubeInfo() {
     #endif
 
     // Draw all of our data to the display
-    drawStaticAndScrollingText(i*8, 50, formattedMins, scrollingText, 255, 80, 0, 150, 150, 150);
+    drawStaticAndScrollingText(i*8, 40, formattedMins, scrollingText, 255, 80, 0, 150, 150, 150);
 
-    // Wait before doign the next one
+    // Wait before doing the next one
     delay(1000);
 
   }
