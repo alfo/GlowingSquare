@@ -94,7 +94,7 @@ void loop() {
     changeBrightnessBlocking(3000);
 
     // Only download new info every 10 seconds
-    if (now - lastWebRequest > INFO_UPDATE_INTERVAL) {
+    if (now - lastWebRequest > INFO_UPDATE_INTERVAL && currentDisplayBrightness != 0) {
 
       downloadAndDisplayNetworkInfo();
 
