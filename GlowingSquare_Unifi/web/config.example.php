@@ -18,3 +18,8 @@ $controllerpassword = ''; // the password for access to the UniFi Controller
 $controllerurl      = ''; // full url to the UniFi Controller, eg. 'https://22.22.11.11:8443', for UniFi OS-based
                           // controllers a port suffix isn't required, no trailing slashes should be added
 $controllerversion  = ''; // the version of the Controller software, e.g. '4.6.6' (must be at least 4.0.0)
+$site_id            = 'default'; // Pick a different one if you have more than one site
+
+// The value that represents 100% height on the graph to begin with
+// based on my house's maximum use per 5 min (ish), change to suit your data usage
+$max_graph = 350000000;

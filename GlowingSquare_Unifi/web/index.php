@@ -49,11 +49,6 @@ function formatBytes($bytes, $precision = 2) {
 }
 
 /**
- * the short name of the site which you wish to query
- */
-$site_id = 'default';
-
-/**
  * initialize the UniFi API connection class and log in to the controller and pull the requested data
  */
 $unifi_connection = new UniFi_API\Client($controlleruser, $controllerpassword, $controllerurl, $site_id, $controllerversion);
@@ -125,22 +120,24 @@ $out['graph'] = [];
 $graph_width = $_GET['width'];
 $graph_height = $_GET['height'];
 
-
-// The value that represents 100% height on the graph to begin with
-// based on my house's maximum use per 5 min (ish)
-$max_graph = 350000000;
-
 // Use the last 100 datapoints to figure out the max height of the graph
 $n = 100;
 foreach (array_slice($minute_stats, -$n, $n) as $stat) {
-  if ($stat->wlan_bytes > $max_graph) $max_graph = $stat->wlan_bytes;
+
+  // Define what we're using for the graph
+  $bytes = $stat->{'wan-rx_bytes'};
+
+  if ($bytes > $max_graph) $max_graph = $bytes;
 }
 
 // Use the display width number of datapoints to draw the graph
 
 foreach (array_slice($minute_stats, -$graph_width, $graph_width) as $stat) {
 
-  $pixel_height = ceil(($stat->wlan_bytes / $max_graph) * $graph_height);
+  // Define what we're using for the graph
+  $bytes = $stat->{'wan-rx_bytes'};
+
+  $pixel_height = ceil(($bytes/ $max_graph) * $graph_height);
   array_push($out['graph'], $pixel_height);
 
 }
@@ -150,3 +147,5 @@ foreach (array_slice($minute_stats, -$graph_width, $graph_width) as $stat) {
 */
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode($out);
+
+?>
