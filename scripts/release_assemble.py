@@ -11,7 +11,9 @@ gh-pages branch, updated in place. assets/ receives <slug>-<env>.bin per env.
 
 A tag with a beta counter (v1.2.3-beta.4) is a test build: it lands in the
 "prerelease" fields of version.json only, and the web flasher keeps offering
-the last stable release. Any other tag updates both.
+the last stable release. Any other tag updates both. Until a project has a
+stable release at all, a test build publishes the web flasher too: an empty
+flasher helps nobody try the first beta.
 
 Run it locally the same way to see what a release would publish.
 """
@@ -90,6 +92,8 @@ def main():
     vpath = a.pages / "version.json"
     vdata = json.loads(vpath.read_text()) if vpath.exists() else {}
     vdata.setdefault("envs", {})
+    has_stable = any(e.get("stable") for e in vdata["envs"].values())
+    publish_flasher = not test or not has_stable
     vdata["url"] = f"https://github.com/{repo}/releases/latest" if repo else ""
 
     boards = []
@@ -108,6 +112,7 @@ def main():
         e.update({"prerelease": version, "prerelease_sha256": sha, "prerelease_size": size})
         if not test:
             e.update({"stable": version, "stable_sha256": sha, "stable_size": size})
+        if publish_flasher:
             out = a.pages / "fw" / env["name"]
             out.mkdir(parents=True, exist_ok=True)
             for part in ("bootloader.bin", "partitions.bin"):
@@ -120,7 +125,7 @@ def main():
         boards.append({
             "env": env["name"], "name": env["flasher_name"], "note": env["flasher_note"],
             "chip": env["chip"], "manifest": f"fw/{env['name']}/manifest.json",
-            "version": e.get("stable", ""),
+            "version": e.get("stable") or version,
         })
         print(f"{env['name']}: {asset.name} {size} bytes sha256 {sha[:12]}")
 
@@ -132,7 +137,7 @@ def main():
             vdata[k] = first[k]
     vpath.write_text(json.dumps(vdata, indent=2) + "\n")
 
-    if not test:
+    if publish_flasher:
         (a.pages / "boards.json").write_text(json.dumps(
             {"app": app_name, "version": version, "boards": boards}, indent=2) + "\n")
         shutil.copy2(ROOT / "flasher/index.html", a.pages / "index.html")
