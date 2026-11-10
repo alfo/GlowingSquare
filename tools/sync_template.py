@@ -29,6 +29,14 @@ CORE = [
 ]
 # Inside the core, but the project's own.
 KEEP = {"src/lang/strings_app.def"}
+# Inside the core directories, but only used with a screen (APP_UI_LVGL):
+# a headless project leaves them out.
+UI_ONLY = {
+    "src/app/screenshot.cpp", "src/app/screenshot.h",
+    "src/app/setup_flow.cpp", "src/app/setup_flow.h",
+    "src/web/web_screenshot.cpp", "src/web/web_screenshot.h",
+    "scripts/lvgl_speed.py",
+}
 
 
 def main():
@@ -41,7 +49,7 @@ def main():
     incoming = set()
     with tarfile.open(fileobj=io.BytesIO(tar)) as t:
         for m in t.getmembers():
-            if not m.isfile() or m.name in KEEP:
+            if not m.isfile() or m.name in KEEP or m.name in UI_ONLY:
                 continue
             incoming.add(m.name)
             dst = ROOT / m.name
@@ -53,7 +61,8 @@ def main():
         files = [p] if p.is_file() else (list(p.rglob("*")) if p.is_dir() else [])
         for f in files:
             rel = str(f.relative_to(ROOT))
-            if f.is_file() and rel not in incoming and rel not in KEEP and "__pycache__" not in rel:
+            if (f.is_file() and rel not in incoming and rel not in KEEP and rel not in UI_ONLY
+                    and "__pycache__" not in rel):
                 gone.append(rel)
     (ROOT / ".template-version").write_text(sha + "\n")
     print(f"synced {len(incoming)} files from {tpl.name}@{sha}")

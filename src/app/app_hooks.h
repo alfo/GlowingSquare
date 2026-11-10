@@ -29,7 +29,8 @@
 //                       comma on the first) to /status.json's "app" object.
 //    statusLine(b, n)   one line for the boot block in the log.
 //    onMdnsService()    after the core's mDNS TXT records, to add more.
-//    buildMainScreen()  (LVGL builds) the home screen.
+//    buildMainScreen(p) (LVGL builds) builds the home screen into p, an
+//                       lv_obj_t* under the header.
 //    openScreen(id)     (LVGL builds) a SUBMENU row asked for screen id.
 // ============================================================
 
@@ -50,7 +51,7 @@ struct AppHooks {
   void (*statusJson)(String &j);
   void (*statusLine)(char *buf, size_t n);
   void (*onMdnsService)();
-  void (*buildMainScreen)();
+  void (*buildMainScreen)(void *parent);   // an lv_obj_t*: the area under the header
   void (*openScreen)(uint8_t id);
 };
 

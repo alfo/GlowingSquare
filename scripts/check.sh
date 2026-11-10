@@ -26,6 +26,11 @@ if [ -n "$hits" ]; then bad "strncpy(buf, T(...)) - use copyT() or snprintf():";
 hits=$(grep -rn 'lv_scr_load(' src | grep -vE '^[^:]+:[0-9]+:\s*//' || true)
 if [ -n "$hits" ]; then bad "lv_scr_load() is banned:"; echo "$hits" | sed 's/^/        /'; else ok "no lv_scr_load()"; fi
 
+# 3b. Colours come from the theme (src/ui/theme_palette.h), never a number
+#     written into a widget: a palette change would miss it.
+hits=$(grep -rnE 'lv_color_hex\(0x[0-9a-fA-F]+' src --include='*.cpp' | grep -v '^src/ui/theme' || true)
+if [ -n "$hits" ]; then bad "colour written as a number (name it in ui/theme_palette.h):"; echo "$hits" | sed 's/^/        /'; else ok "no raw colours in widgets"; fi
+
 # 4. The version is vX.Y.Z or vX.Y.Z-beta.N. A bare "-beta" ranks at 0 in
 #    version_compare and in the release guard.
 v=$(sed -nE 's/^#define[[:space:]]+FW_VERSION[[:space:]]+"([^"]+)".*/\1/p' src/project/project_config.h | head -1)

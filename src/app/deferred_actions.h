@@ -41,6 +41,8 @@ extern bool show_settings_pending;
 // A SUBMENU row in the registry asked for its screen. The project's
 // appHooks.openScreen() is called with this id; 0 = none.
 extern uint8_t open_project_screen_pending;
+// The id openScreen() gets for the project's own setup step.
+#define UI_SCREEN_SETUP_STEP 255
 
 // Arms a restart `delay_ms` from now, so a web answer can still be sent.
 void requestRestart(unsigned long delay_ms);

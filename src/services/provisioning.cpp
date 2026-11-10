@@ -27,8 +27,10 @@
 enum ProvState : uint8_t { PS_IDLE, PS_PORTAL, PS_CONNECTING };
 
 static ProvState     s_state       = PS_IDLE;
+#if !defined(APP_UI_LVGL)
 static unsigned long s_since_ms    = 0;
 static bool          s_had_wifi    = false;   // an SSID was stored when the portal opened
+#endif
 
 #if !defined(APP_UI_LVGL)
 static void notifyPortal(bool open) {

@@ -5,7 +5,7 @@ Status (2026-11-10), branch `modernise`:
 | Phase | State |
 |---|---|
 | 1 Template core | done, pushed to flatfieldco/esp32-iot-template (`27d2bdd`) |
-| 2-3 Template UI + boards + fonts | in progress (separate agent, template repo only) |
+| 2-3 Template UI + boards + fonts | done, pushed (`5171fb8`, `f2b63c1`): WT32-SC01 Plus and nine Waveshare AMOLED envs build; none run on hardware; tools/gen_fonts.py written but not yet run |
 | 4 Template CI/release/flasher | done with phase 1 (release.yml, multi-board flasher) |
 | 5-7 GS2 firmware, modes, MQTT/HA | done here; all three envs build; host render test passes against recorded TfL / adsb.lol / adsbdb answers and a synthetic UniFi fixture |
 | 8 GS2 CI/README | done here; not yet committed; nothing tested on hardware |
