@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <title>Web Flasher</title>
+  <!-- ESP Web Tools: flashes over WebSerial, then hands the device its WiFi
+       over Improv. Pinned, like every other dependency. -->
+  <script type="module" src="https://unpkg.com/esp-web-tools@10.0.1/dist/web/install-button.js?module"></script>
+  <style>
+    :root {
+      --ground: #06080f; --surface: #0c1828; --surface-2: #080d1a; --line: #1a3060;
+      --ink: #e8f0ff; --ink-2: #c8d8f0; --ink-soft: #6d8cb8; --accent: #4cc2ff;
+      --warn: #f0b838; --warn-bg: #1a1a08; --warn-line: #3a2800;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --ground: #eef3f9; --surface: #ffffff; --surface-2: #f4f7fb; --line: #b9c8dd;
+        --ink: #0f1a2a; --ink-2: #243449; --ink-soft: #50627c; --accent: #0a6fb0;
+        --warn: #8a5a00; --warn-bg: #fdf4dc; --warn-line: #e2c77a;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--ground); color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 40px 16px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 40px 32px; max-width: 540px; width: 100%; text-align: center;
+    }
+    .logo { width: 88px; height: 88px; margin: 0 auto 16px; }
+    h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--accent); }
+    .tagline { color: var(--ink-soft); font-size: 15px; margin: 6px 0 28px; }
+    label { display: block; text-align: left; font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+    select {
+      width: 100%; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 10px;
+      background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+    }
+    .note { text-align: left; color: var(--ink-soft); font-size: 13px; line-height: 1.5; margin: 8px 0 24px; min-height: 1em; }
+    .steps { text-align: left; background: var(--surface-2); border-radius: 10px; padding: 18px 22px; margin-bottom: 24px; }
+    .steps h2 { color: var(--ink-2); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .steps ol { padding-left: 20px; color: var(--ink-soft); font-size: 14px; line-height: 1.9; }
+    .steps b { color: var(--ink-2); font-weight: 600; }
+    esp-web-install-button { display: block; margin-bottom: 16px; }
+    esp-web-install-button::part(button) {
+      width: 100%; padding: 14px 32px; font-size: 16px; font-weight: 600; cursor: pointer;
+      border-radius: 10px; border: 1px solid var(--accent); background: transparent; color: var(--accent);
+    }
+    .warning {
+      background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 8px;
+      padding: 12px 16px; color: var(--warn); font-size: 13px; text-align: left; line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .warning summary { cursor: pointer; font-weight: 600; }
+    .version { color: var(--ink-soft); font-size: 12px; margin-top: 20px; }
+    .version a { color: var(--ink-soft); }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="logo.svg" alt="">
+    <h1 id="app">Web Flasher</h1>
+    <p class="tagline">Flash the firmware straight from your browser</p>
+
+    <label for="board">Your board</label>
+    <select id="board"><option>Loading...</option></select>
+    <p class="note" id="note"></p>
+
+    <div class="steps">
+      <h2>How it works</h2>
+      <ol>
+        <li>Connect the board to this computer with a <b>data</b> USB cable.</li>
+        <li>Pick your board above and click <b>Install</b>. A board already running this firmware is offered <b>Update</b>, which keeps its settings.</li>
+        <li>Choose the serial port and confirm.</li>
+        <li>When it is done, enter your <b>WiFi</b> right here. Or skip that: the board opens a setup WiFi of its own you can join from a phone.</li>
+      </ol>
+    </div>
+
+    <esp-web-install-button id="install">
+      <span slot="unsupported">This browser cannot talk to USB devices. Please use <b>Chrome</b> or <b>Edge</b> on a desktop.</span>
+      <span slot="not-allowed">No USB access here. Open this page over <b>HTTPS</b>.</span>
+    </esp-web-install-button>
+
+    <details class="warning">
+      <summary>Flashing fails with "Failed to initialize"?</summary>
+      Close anything else using the port (Arduino IDE, a serial monitor, another flasher tab)
+      and plug straight into the computer, no hub. Still failing: hold the board's <b>BOOT</b>
+      button, press and release <b>RST</b> (or <b>EN</b>), release <b>BOOT</b>, then click Install again.
+    </details>
+
+    <p class="version" id="version"></p>
+  </main>
+  <script>
+    // boards.json is written by scripts/release_assemble.py on every release:
+    // one entry per firmware build, each with its own manifest.
+    const sel = document.getElementById('board');
+    const note = document.getElementById('note');
+    const btn = document.getElementById('install');
+    let boards = [];
+    function pick() {
+      const b = boards[sel.selectedIndex];
+      if (!b) return;
+      btn.setAttribute('manifest', b.manifest);
+      note.textContent = b.note || (b.chip + ' board');
+      try { localStorage.setItem('board', b.env); } catch (e) {}
+    }
+    fetch('boards.json', { cache: 'no-store' }).then(r => r.json()).then(d => {
+      boards = d.boards || [];
+      document.title = d.app + ' - Web Flasher';
+      document.getElementById('app').textContent = d.app;
+      document.getElementById('version').textContent = 'Firmware ' + d.version;
+      sel.textContent = '';
+      let want = null;
+      try { want = localStorage.getItem('board'); } catch (e) {}
+      boards.forEach((b, i) => {
+        const o = document.createElement('option');
+        o.textContent = b.name + ' (' + b.chip + ')';
+        if (b.env === want) o.selected = true;
+        sel.appendChild(o);
+      });
+      pick();
+    }).catch(() => {
+      sel.innerHTML = '<option>No release published yet</option>';
+    });
+    sel.addEventListener('change', pick);
+  </script>
+</body>
+</html>

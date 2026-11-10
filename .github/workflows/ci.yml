@@ -1,0 +1,63 @@
+name: CI
+
+# Every push and pull request: the house rules, the host tests, and a build
+# of every env with its size gate. Releases are release.yml, on a tag.
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['v*']
+    paths-ignore: ['*.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['*.md', 'docs/**']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: House rules and host tests
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.envs.outputs.envs }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: scripts/check.sh
+        run: scripts/check.sh
+      - name: Host tests
+        run: |
+          for t in test/test_*.py; do
+            echo "== $t"
+            python3 "$t"
+          done
+      - name: Envs to build
+        id: envs
+        run: echo "envs=$(python3 scripts/pio_envs.py --matrix)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.env }}
+    needs: checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: ${{ fromJSON(needs.checks.outputs.envs) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pio
+      - name: Build
+        run: pio run -e ${{ matrix.env }}
+      - name: Size gate
+        run: python3 scripts/size_gate.py ${{ matrix.env }}
+      # The display modes' fetch and drawing code against recorded API
+      # answers; needs the libraries this build just fetched.
+      - name: Host render test
+        run: python3 test/test_render.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.env }}-${{ github.sha }}
+          path: .pio/build/${{ matrix.env }}/firmware.bin
+          retention-days: 14

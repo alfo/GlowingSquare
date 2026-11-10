@@ -1,0 +1,117 @@
+#include "http_progress.h"
+
+#include <Arduino.h>
+
+#include "services/loop_task.h"
+
+static HttpProgressFn s_progress = nullptr;
+
+static uint32_t s_stall_total_ms = 0;
+static uint32_t s_stall_started   = 0;
+static uint8_t  s_stall_depth     = 0;
+
+// The open outermost bracket's name and call count, and the worst one closed
+// since the last take. Loop task only, like everything above.
+static const char*    s_stall_what  = nullptr;
+static uint8_t        s_stall_calls = 0;
+static HttpStallWorst s_worst       = {0, nullptr, 0, 0};
+
+void httpStallBegin(const char* what) {
+  // The web worker's requests hold nothing on screen up; only the loop's own
+  // waits are time a countdown must give back.
+  if (!onLoopTask()) return;
+  if (s_stall_depth == 0) {
+    s_stall_started = millis();
+    s_stall_what    = nullptr;
+    s_stall_calls   = 0;
+  }
+  if (what) {
+    if (!s_stall_what) s_stall_what = what;
+    if (s_stall_calls < 255) s_stall_calls++;
+  }
+  if (s_stall_depth < 255) s_stall_depth++;
+}
+
+void httpStallEnd() {
+  if (!onLoopTask()) return;
+  if (s_stall_depth == 0) return;
+  s_stall_depth--;
+  // Only the outermost bracket adds anything: the inner ones are already
+  // inside the span it is measuring.
+  if (s_stall_depth != 0) return;
+  const uint32_t span_ms = millis() - s_stall_started;
+  s_stall_total_ms += span_ms;
+  if (s_worst.spans < UINT16_MAX) s_worst.spans++;
+  if (span_ms >= s_worst.ms) {
+    s_worst.ms    = span_ms;
+    s_worst.what  = s_stall_what;
+    s_worst.calls = s_stall_calls;
+  }
+}
+
+HttpStallWorst httpStallWorstTake() {
+  const HttpStallWorst taken = s_worst;
+  s_worst = {0, nullptr, 0, 0};
+  return taken;
+}
+
+uint32_t httpStallTotalMs() {
+  // A bracket that is still open counts as far as it has come, so a clock
+  // asked in the middle of one - which cannot happen from the loop, but can
+  // from a progress hook - sees the truth rather than the last total.
+  if (s_stall_depth > 0) return s_stall_total_ms + (millis() - s_stall_started);
+  return s_stall_total_ms;
+}
+
+void           httpSetProgressHook(HttpProgressFn fn) { s_progress = fn; }
+HttpProgressFn httpProgressHook()                     { return s_progress; }
+// A hook paints into LVGL, and only the loop task may. The loop sets one
+// around its own blocking fetch, and a worker on the other core requesting at
+// that moment would otherwise find it set and call it from there.
+// The worker counting its own download, see httpCountBytesInto().
+static volatile size_t* s_count_into = nullptr;
+static TaskHandle_t     s_count_task = nullptr;
+
+static bool countingHere() {
+  return s_count_into && xTaskGetCurrentTaskHandle() == s_count_task;
+}
+
+void httpCountBytesInto(volatile size_t* into) {
+  s_count_task = into ? xTaskGetCurrentTaskHandle() : nullptr;
+  s_count_into = into;
+}
+
+bool           httpProgressActive() {
+  return (s_progress != nullptr && onLoopTask()) || countingHere();
+}
+
+// The hook is called every PROGRESS_STEP bytes rather than per byte: the count
+// itself is free, but a hook that redraws is not, and ArduinoJson pulls one
+// byte at a time often enough to matter. The hook throttles again by time -
+// this only keeps the call out of the innermost loop.
+#define PROGRESS_STEP  512
+
+// How long a worker may read and parse without giving CPU 0 away. While the
+// response arrives faster than ArduinoJson takes it apart, the read never
+// blocks, and a FilaMan inventory is 4.5 to 7.5 s of that. The idle task of
+// CPU 0 starved, and the task watchdog reset the device 5 s in: twice on
+// 24.09.2026 with "cpu0=backendjob", once already on beta.63. One tick every
+// 100 ms costs the download about 1 %.
+#define WORKER_YIELD_MS  100
+
+static uint32_t s_worker_yield_ms = 0;
+
+void HttpProgressStream::count(size_t n) {
+  total_ += n;
+  if (total_ - last_ < PROGRESS_STEP) return;
+  last_ = total_;
+  if (countingHere()) {
+    *s_count_into = total_;
+    if (millis() - s_worker_yield_ms >= WORKER_YIELD_MS) {
+      vTaskDelay(1);
+      s_worker_yield_ms = millis();
+    }
+    return;
+  }
+  if (s_progress && onLoopTask()) s_progress(total_);
+}

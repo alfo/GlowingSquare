@@ -1,0 +1,9 @@
+# ESP32-S3, 8 MB flash. Same layout as the 16 MB table with 3 MB app slots.
+#
+# Name,     Type, SubType,  Offset,   Size,     Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xe000,   0x2000,
+app0,       app,  ota_0,    0x10000,  0x300000,
+app1,       app,  ota_1,    0x310000, 0x300000,
+coredump,   data, coredump, 0x610000, 0x10000,
+spiffs,     data, spiffs,   0x620000, 0x1E0000,

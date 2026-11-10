@@ -1,0 +1,31 @@
+name: Set up PlatformIO
+description: Python, pinned PlatformIO, and the platform's own pinned environment, with a cache.
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.platformio/.cache
+          ~/.platformio/packages
+          ~/.platformio/platforms
+        key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    # Pinned like the platform and the libraries: 6.2.0.post1 reports itself
+    # as 6.2.0-post.1, which the pinned platform reads as older than the 6.2.0
+    # it requires.
+    - name: Install PlatformIO
+      shell: bash
+      run: pip install platformio==6.2.0
+    # The platform builds part of the firmware in its own Python environment
+    # (~/.platformio/penv) and installs "pioarduino>=6.2.0" there, which would
+    # resolve to the post release with the same problem. Created here first,
+    # the platform finds it satisfied and keeps it.
+    - name: Pin PlatformIO inside the platform's environment
+      shell: bash
+      run: |
+        python -m venv ~/.platformio/penv
+        ~/.platformio/penv/bin/pip install --quiet pioarduino==6.2.0

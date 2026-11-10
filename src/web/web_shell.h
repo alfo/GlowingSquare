@@ -1,0 +1,54 @@
+#pragma once
+
+#include <Arduino.h>
+
+// Chrome shared by every served page. The registry wraps each page in it, so
+// a new page cannot end up with half of it or with a lookalike of its own.
+//
+//   webShellHead(title)   doctype, head, stylesheet, opens .wrap
+//   webShellHeader()      logo, wordmark, version, the device address
+//   webShellNav(path)     the tab strip, built from the page table
+//   <the page's cards>
+//   webShellFoot()        community links, disclaimer, closes everything
+String webShellHead(const char *title);
+// The parts of the head a page standing outside the shell needs too, so it
+// takes the palette the device runs: the doctype with the <html> tag that
+// names the palette and the own colours, and the stylesheet with /app.js.
+// The palette the pages use: auto follows the browser.
+enum WebTheme : uint8_t { WEB_THEME_AUTO = 0, WEB_THEME_DARK = 1, WEB_THEME_LIGHT = 2 };
+void        webThemeLoad();
+uint8_t     webThemeGet();
+bool        webThemeSet(uint8_t v);
+const char* webThemeKey(uint8_t v);
+
+String webShellDocOpen();
+String webShellAssets();
+String webShellHeader();
+String webShellNav(const char *active);
+String webShellLinks();
+String webShellFoot();
+
+// The overlay waits before polling: the old server answers for a moment after
+// the request, and an immediate poll would reload too early.
+String webShellRestartUi();
+
+// Opens a page's <script> block: assigns the two strings /app.js needs into
+// its holder. Emit it first, then whatever the page needs of its own.
+String webShellJsStrings();
+
+// Wraps a translated string as a JavaScript string literal, quotes included.
+// Use it for every T() text that lands inside a <script> block.
+String jsStr(const char *in);
+
+// Escapes a string for the inside of a JSON string literal, quotes not
+// included. Newlines survive as \n rather than collapsing to spaces, which
+// matters for anything multi-line: release notes and NDEF text records both
+// come through here.
+String jsonEsc(const char *s);
+
+// For a runtime value that lands in HTML - between tags or inside a quoted
+// attribute. The backend host, the SSID and the backend URL all come from a
+// keyboard, and one apostrophe in a value='...' attribute was enough to run a
+// script on every page load.
+String htmlEsc(const char *s);
+

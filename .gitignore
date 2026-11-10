@@ -1,11 +1,35 @@
-# ignore all logs
-*.log
+# Ignore everything, then allow what belongs in the repository. A file that
+# should be tracked and is not listed here stays out until it is.
+*
 
-.DS_Store
+!src/
+!src/**
+!partitions/
+!partitions/**
+!flasher/
+!flasher/**
+!.github/
+!.github/**
+!scripts/
+!scripts/**
+!tools/
+!tools/**
+!test/
+!test/**
+!docs/
+!docs/**
+!platformio.ini
+!Enclosure/
+!lib/
+!lib/**
+!Enclosure/**
+!.template-version
+!README.md
+!AGENTS.md
+!NOTICE.md
+!LICENSE
+!.gitignore
 
-config.php
-
-secret.h
-
-Icon\r\r
-Icon[]
+# Re-excluded after the whitelist above.
+**/__pycache__/
+**/.DS_Store

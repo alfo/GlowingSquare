@@ -1,0 +1,120 @@
+// Runs Glowing Square's real fetch and drawing code on a computer: each mode
+// parses a recorded API answer (test/fixtures), commits it, and draws. The
+// canvas is written out as raw RGB565 at the moments named below, for
+// test_render.py to check and to turn into pictures.
+#include <Arduino.h>
+#include <ArduinoJson.h>
+#include <cassert>
+#include <fstream>
+#include <sstream>
+
+#include "project/gs_http.h"
+#include "project/gs_state.h"
+#include "project/matrix/matrix.h"
+#include "project/modes/modes.h"
+#include "project/render.h"
+
+uint32_t g_fake_ms = 1000;
+static std::string g_fixtures;
+static std::string g_out;
+
+static std::string slurp(const std::string &path) {
+  std::ifstream f(path);
+  if (!f) { fprintf(stderr, "missing fixture %s\n", path.c_str()); exit(2); }
+  std::stringstream b; b << f.rdbuf(); return b.str();
+}
+
+// Every request answered from a file, picked by a piece of its URL. The
+// filter is applied exactly as on the device.
+int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter, char *err, size_t n) {
+  static const struct { const char *part, *file; } MAP[] = {
+    { "api.tfl.gov.uk",              "tfl_victoria_oxc.json" },
+    { "api.adsb.lol",                "adsb_london.json" },
+    { "api.adsbdb.com",              "adsbdb_THA917.json" },
+    { "stat/sta",                    "unifi_sta.json" },
+    { "stat/report/5minutes.site",   "unifi_5min.json" },
+    { "stat/report/daily.site",      "unifi_daily.json" },
+  };
+  for (auto &m : MAP) {
+    if (!strstr(req.url, m.part)) continue;
+    const std::string body = slurp(g_fixtures + "/" + m.file);
+    auto e = filter ? deserializeJson(out, body, DeserializationOption::Filter(*filter))
+                    : deserializeJson(out, body);
+    if (e) { snprintf(err, n, "JSON: %s", e.c_str()); return -2; }
+    return 200;
+  }
+  snprintf(err, n, "no fixture for %s", req.url);
+  return 404;
+}
+
+static void dump(const char *name) {
+  std::ofstream f(g_out + "/" + name + ".rgb565", std::ios::binary);
+  f.write((const char *)matrixCanvas().getBuffer(), MATRIX_W * MATRIX_H * 2);
+}
+
+static uint16_t px(int x, int y) { return matrixCanvas().getPixel(x, y); }
+static bool rowHasColour(int y0, uint16_t c) {
+  for (int y = y0; y < y0 + 8; y++) for (int x = 0; x < MATRIX_W; x++) if (px(x, y) == c) return true;
+  return false;
+}
+
+static void runFor(const DisplayMode &m, uint32_t ms) {
+  const uint32_t end = g_fake_ms + ms;
+  while (g_fake_ms < end) { g_fake_ms += 5; m.frame(g_fake_ms); }
+}
+
+static void fetchCommit(const DisplayMode &m) {
+  char err[96] = "";
+  if (!m.fetch(err, sizeof err)) { fprintf(stderr, "%s fetch failed: %s\n", m.key, err); exit(1); }
+  m.commit();
+}
+
+int main(int argc, char **argv) {
+  g_fixtures = argv[1];
+  g_out = argv[2];
+  renderBegin();
+
+  // ---- Tube: Oxford Circus, Victoria line, southbound ----
+  snprintf(g_tfl_stop, sizeof g_tfl_stop, "940GZZLUOXC");
+  snprintf(g_tfl_line, sizeof g_tfl_line, "victoria");
+  g_scroll_ms = 40;
+  fetchCommit(MODE_TUBE_OPS);
+  dump("tube_start");
+  assert(rowHasColour(0, rgb565(255, 80, 0)));         // minutes, orange
+  assert(rowHasColour(0, rgb565(150, 150, 150)));      // destination, grey
+  runFor(MODE_TUBE_OPS, 1200);
+  dump("tube_scrolling");
+  runFor(MODE_TUBE_OPS, 60000);                        // every row has had its turn
+  dump("tube_settled");
+  for (int r = 0; r < 4; r++) assert(rowHasColour(r * 8, rgb565(255, 80, 0)));
+
+  // ---- Flights: central London ----
+  snprintf(g_fl_lat, sizeof g_fl_lat, "51.5074");
+  snprintf(g_fl_lon, sizeof g_fl_lon, "-0.1278");
+  g_fl_radius_nm = 10;
+  g_fl_min_alt_ft = 500;
+  MODE_FLIGHTS_OPS.enter();
+  fetchCommit(MODE_FLIGHTS_OPS);
+  dump("flights");
+  assert(rowHasColour(0, rgb565(0, 255, 255)));        // LHR>BKK
+  assert(rowHasColour(16, rgb565(255, 0, 0)));         // 9050ft: below 10,000, red
+
+  // ---- Unifi ----
+  snprintf(g_unifi_url, sizeof g_unifi_url, "https://192.168.1.1");
+  snprintf(g_unifi_key, sizeof g_unifi_key, "test");
+  g_unifi_auth = UNIFI_AUTH_KEY;
+  MODE_UNIFI_OPS.enter();
+  fetchCommit(MODE_UNIFI_OPS);
+  dump("unifi_start");
+  assert(rowHasColour(24, rgb565(21, 58, 234)));       // the graph
+  runFor(MODE_UNIFI_OPS, 1500);
+  dump("unifi_new_client");
+
+  // ---- Offline ----
+  drawOffline();
+  dump("offline");
+  assert(px(63, 31) == rgb565(255, 0, 0));
+
+  printf("host render: ok\n");
+  return 0;
+}
