@@ -11,9 +11,9 @@
 #define APP_SLUG          "glowingsquare"
 #define APP_NVS_NAMESPACE "glowsq"          // never change once devices exist
 
-#define APP_GH_REPO       "alfo/glowingsquare"
-#define APP_PAGES_URL     "https://alfo.github.io/glowingsquare/"
-#define APP_DOCS_URL      "https://github.com/alfo/glowingsquare#readme"
+#define APP_GH_REPO       "alfo/GlowingSquare"
+#define APP_PAGES_URL     "https://alfo.github.io/GlowingSquare/"
+#define APP_DOCS_URL      "https://github.com/alfo/GlowingSquare#readme"
 
 // The Tube orange the departures are drawn in.
 #define APP_ACCENT_DARK   "#ff7a1a"

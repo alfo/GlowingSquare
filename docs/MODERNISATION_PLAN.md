@@ -148,7 +148,7 @@ web pages: Status (live preview of the 64x32 frame), Settings, Network, Firmware
 | `gs-esp32-dma` | classic ESP32 wired for DMA / Lough I2S shield / Trinity | HUB75 DMA |
 | `gs-s3-dma` | any ESP32-S3 | HUB75 DMA |
 
-The flasher at `alfo.github.io/glowingsquare` lists all three.
+The flasher at `alfo.github.io/GlowingSquare` lists all three.
 
 ### Repo layout after the change
 - `Enclosure/` stays.

@@ -28,7 +28,7 @@ The v1 sketches are kept under the [`v1-legacy`](../../tree/v1-legacy) tag.
   display.
 - **Web interface.** A status page with a live view of the matrix, a Settings
   page for every option, firmware updates, logs, and a password if you want one.
-- **Install from the browser.** The [web flasher](https://alfo.github.io/glowingsquare/)
+- **Install from the browser.** The [web flasher](https://alfo.github.io/GlowingSquare/)
   flashes the firmware over USB and hands the device your WiFi. After that,
   updates arrive over the air from GitHub Releases.
 - **No more PHP.** Unifi mode talks to your console directly, with an API key.
@@ -69,7 +69,7 @@ Fusion 360 model showing how it all fits together and what wood is needed.
 
 ## Setting up
 
-1. Open the [web flasher](https://alfo.github.io/glowingsquare/) in Chrome or
+1. Open the [web flasher](https://alfo.github.io/GlowingSquare/) in Chrome or
    Edge, pick your build, connect the board over USB and click **Install**.
    Enter your WiFi when it asks.
 2. Or skip that: the matrix shows a setup WiFi network and its password. Join
