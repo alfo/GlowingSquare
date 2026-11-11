@@ -5,9 +5,16 @@
 // On Arduino core 3 every SPI call takes a mutex, which may not be taken
 // there: FreeRTOS asserts on the first refresh and the device boot-loops.
 // An esp_timer callback runs in the esp_timer task instead, at the same
-// period, where taking the SPI lock is allowed. Pins are Brian Lough's ESP32 Matrix Shield (Mini 32): R1 on GPIO13
-// (SPI MOSI) and CLK on 14 through the SPI peripheral, the rest as below.
+// period, where taking the SPI lock is allowed.
+//
+// The panel is lit in bursts, one per refresh, and on some builds the power
+// supply sings at that rate. The period and the on-time are settings
+// (g_px_period_us, g_px_on_us, Settings > Panel) and apply at once.
+//
+// Pins are Brian Lough's ESP32 Matrix Shield (Mini 32): R1 on GPIO13 (SPI
+// MOSI) and CLK on 14 through the SPI peripheral, the rest as below.
 #include "project/matrix/matrix.h"
+#include "project/gs_state.h"
 
 #include <Arduino.h>
 #include <esp_timer.h>
@@ -22,18 +29,17 @@
 #define PIN_C   18
 #define PIN_D    5
 
-// The panel's on-time per refresh in microseconds: the larger, the brighter.
-// 30 to 70 is safe; much more and the interrupt starves the loop.
-#define DISPLAY_DRAW_TIME 70
-// One refresh every 4 ms, as v1.
-#define REFRESH_PERIOD_US 4000
-
 static PxMATRIX display(MATRIX_W, MATRIX_H, PIN_LAT, PIN_OE, PIN_A, PIN_B, PIN_C, PIN_D);
 static esp_timer_handle_t s_timer = nullptr;
 
+static volatile uint32_t s_refreshes = 0;
+
 static void displayUpdater(void *) {
-  display.display(DISPLAY_DRAW_TIME);
+  display.display((uint16_t)g_px_on_us);
+  s_refreshes = s_refreshes + 1;
 }
+
+uint32_t matrixRefreshCount() { return s_refreshes; }
 
 bool matrixBegin() {
   display.begin(16);                   // 1/16 scan
@@ -48,7 +54,14 @@ bool matrixBegin() {
     .skip_unhandled_events = true,   // a late refresh is skipped, not queued up
   };
   if (esp_timer_create(&args, &s_timer) != ESP_OK) return false;
-  return esp_timer_start_periodic(s_timer, REFRESH_PERIOD_US) == ESP_OK;
+  return esp_timer_start_periodic(s_timer, (uint64_t)g_px_period_us) == ESP_OK;
+}
+
+// A new period takes effect at once; the on-time is read on every refresh.
+void matrixApplyTiming() {
+  if (!s_timer) return;
+  esp_timer_stop(s_timer);
+  esp_timer_start_periodic(s_timer, (uint64_t)g_px_period_us);
 }
 
 void matrixShow() {

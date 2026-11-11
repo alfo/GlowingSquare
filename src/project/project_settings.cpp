@@ -5,6 +5,7 @@
 
 #include "project/gs_state.h"
 #include "project/gs_web_extra.h"
+#include "project/matrix/matrix.h"
 #include "lang.h"
 
 enum Section : uint8_t { SEC_DISPLAY = 0, SEC_TUBE, SEC_FLIGHTS, SEC_UNIFI, SEC_MQTT, SEC_PINS };
@@ -18,8 +19,14 @@ static bool unifiLogin()  { return g_unifi_auth != UNIFI_AUTH_KEY; }
 #ifdef MATRIX_DMA
 static bool always()      { return true; }
 #endif
+#ifdef MATRIX_PXMATRIX
+#define SEC_PANEL SEC_PINS   // the PxMatrix build has no pins section: same index
+#endif
 
 static void modeChanged() { g_mode_changed = true; }
+#ifdef MATRIX_PXMATRIX
+static void timingChanged() { matrixApplyTiming(); }
+#endif
 
 const SettingSection SETTING_SECTIONS[] = {
   { "display", STR_P_SEC_DISPLAY, STR_P_SEC_DISPLAY_INFO, nullptr,     nullptr },
@@ -29,6 +36,9 @@ const SettingSection SETTING_SECTIONS[] = {
   { "mqtt",    STR_P_SEC_MQTT,    STR_P_SEC_MQTT_INFO,    nullptr,     nullptr },
 #ifdef MATRIX_DMA
   { "pins",    STR_P_SEC_PINS,    STR_P_SEC_PINS_INFO,    always,      nullptr },
+#endif
+#ifdef MATRIX_PXMATRIX
+  { "panel",   STR_P_SEC_PANEL,   STR_P_SEC_PANEL_INFO,   nullptr,     nullptr },
 #endif
 };
 const size_t SETTING_SECTIONS_COUNT = sizeof(SETTING_SECTIONS) / sizeof(SETTING_SECTIONS[0]);
@@ -91,6 +101,14 @@ const SettingDesc SETTINGS[] = {
   SETTING_TEXT("mqtt_room", SEC_MQTT, g_mqtt_room, STR_P_MQTT_ROOM, "living_room").info(STR_P_MQTT_ROOM_INFO).when(mqttOn),
   SETTING_TEXT("mqtt_name", SEC_MQTT, g_mqtt_name, STR_P_MQTT_NAME, "").info(STR_P_MQTT_NAME_INFO).when(mqttOn),
   settingBool("mqtt_ha", SEC_MQTT, &g_mqtt_ha, STR_P_MQTT_HA, true).info(STR_P_MQTT_HA_INFO).when(mqttOn),
+
+#ifdef MATRIX_PXMATRIX
+  // ---- Panel ----
+  settingInt("px_period", SEC_PANEL, &g_px_period_us, STR_P_PX_PERIOD, 4000, 1000, 8000)
+      .unitLabel("µs").info(STR_P_PX_PERIOD_INFO).onChange(timingChanged),
+  settingInt("px_on", SEC_PANEL, &g_px_on_us, STR_P_PX_ON, 70, 10, 200)
+      .unitLabel("µs").info(STR_P_PX_ON_INFO),
+#endif
 
 #ifdef MATRIX_DMA
   // ---- Pins ----

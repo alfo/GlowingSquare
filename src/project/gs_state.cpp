@@ -36,6 +36,11 @@ char    g_mqtt_room[30]    = "living_room";
 char    g_mqtt_name[40]    = "";
 bool    g_mqtt_ha          = true;
 
+#ifdef MATRIX_PXMATRIX
+int32_t g_px_period_us = 4000;
+int32_t g_px_on_us     = 70;
+#endif
+
 #ifdef MATRIX_DMA
 int32_t g_pin[14];
 #endif

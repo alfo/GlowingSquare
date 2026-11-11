@@ -15,6 +15,9 @@ S(STR_P_SEC_MQTT_INFO,    "Brightness and party mode from your MQTT broker, on t
 S(STR_P_SEC_PINS,         "HUB75 pins")
 S(STR_P_SEC_PINS_INFO,    "Which GPIO drives each panel line. Takes effect after a restart.")
 
+S(STR_P_SEC_PANEL,      "Panel")
+S(STR_P_SEC_PANEL_INFO, "How PxMatrix drives the panel. If the power supply whines, try a shorter refresh period; changes apply at once.")
+
 // ---- Display ----
 S(STR_P_MODE,             "Mode")
 S(STR_P_MODE_TUBE,        "Tube / Bus departures")
@@ -74,6 +77,12 @@ S(STR_P_MQTT_NAME,        "Device topic")
 S(STR_P_MQTT_NAME_INFO,   "The middle part: <room>/<this>/in. Empty uses glowingsquare/<mode>, as v1 did.")
 S(STR_P_MQTT_HA,          "Home Assistant discovery")
 S(STR_P_MQTT_HA_INFO,     "Announces a light (on/off, brightness) and selects for the mode and party mode.")
+
+// ---- Panel ----
+S(STR_P_PX_PERIOD,      "Refresh period")
+S(STR_P_PX_PERIOD_INFO, "One refresh every this long. v1 used 4000. Shorter moves the whine higher (often out of hearing) and brightens the panel.")
+S(STR_P_PX_ON,          "On-time per row")
+S(STR_P_PX_ON_INFO,     "How long each row is lit per refresh. v1 used 70. Lower is dimmer and draws less current per burst.")
 
 // ---- Pins ----
 S(STR_P_PIN_R1, "R1")

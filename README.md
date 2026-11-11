@@ -77,6 +77,15 @@ Fusion 360 model showing how it all fits together and what wood is needed.
 3. Open the address the device shows (or `http://glowingsquare.local/`), go to
    **Settings**, choose a mode and fill in its section.
 
+**Flashing over USB with the panel connected** (Mini 32 shield): the panel's
+OE line sits on GPIO2, one of the pins the ESP32 reads at reset, and a powered
+panel holds it high, so the board refuses to enter download mode ("Wrong boot
+mode detected"). Unplug the ribbon to the panel while flashing, then plug it
+back in. Updates after the first install come over WiFi and avoid this.
+
+The D1 Mini 32's USB chip is a CP2104, which macOS supports out of the box;
+no driver is needed.
+
 To move the device to another network later, hold **BOOT** for three seconds,
 or use **Network → Change network**.
 

@@ -48,3 +48,7 @@ void matrixSetBrightness(uint8_t level) {
 }
 
 const char *matrixDriverName() { return "HUB75 DMA"; }
+
+uint32_t matrixRefreshCount() { return 0; }
+
+void matrixApplyTiming() {}   // the DMA refresh has no software timing

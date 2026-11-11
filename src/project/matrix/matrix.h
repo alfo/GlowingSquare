@@ -34,6 +34,13 @@ void matrixShow();
 // 0..255, applied by the driver (PxMatrix: on-time, DMA: OE duty).
 void matrixSetBrightness(uint8_t level);
 
+// Panel refreshes since boot (PxMatrix: one colour plane each), for the log.
+// 0 on drivers that refresh by DMA.
+uint32_t matrixRefreshCount();
+
+// PxMatrix builds: apply a changed refresh period (g_px_period_us) now.
+void matrixApplyTiming();
+
 // Which driver this build has, for the Status page and the log.
 const char *matrixDriverName();
 

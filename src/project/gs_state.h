@@ -48,6 +48,12 @@ extern char    g_mqtt_room[30];    // v1: "living_room"
 extern char    g_mqtt_name[40];    // empty = "glowingsquare/<mode>", as v1
 extern bool    g_mqtt_ha;          // Home Assistant discovery
 
+// ---- Panel timing (PxMatrix builds) ----------------------------------------
+#ifdef MATRIX_PXMATRIX
+extern int32_t g_px_period_us;     // one refresh every this long (v1: 4000)
+extern int32_t g_px_on_us;         // a row's on-time per refresh (v1: 70)
+#endif
+
 // ---- HUB75 pins (DMA builds) -----------------------------------------------
 #ifdef MATRIX_DMA
 extern int32_t g_pin[14];          // R1 G1 B1 R2 G2 B2 A B C D E LAT OE CLK
