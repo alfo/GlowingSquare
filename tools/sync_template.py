@@ -23,7 +23,7 @@ CORE = [
     "src/main.cpp", "src/app_config.h",
     "src/hardware/flash_log.h", "src/hardware/flash_log.cpp",
     "src/hardware/sd_logger.h", "src/hardware/sd_logger.cpp",
-    "scripts", "flasher/index.html", ".github/actions", ".github/workflows/release.yml",
+    "scripts", "flasher", ".github/actions", ".github/workflows/release.yml",
     "partitions", "tools/gen_web_assets.py",
     "test/test_worker_rules.py", "test/test_local_date.py", "test/test_accent_fold.py",
 ]

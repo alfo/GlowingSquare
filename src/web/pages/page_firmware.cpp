@@ -286,6 +286,7 @@ static String body() {
   h += F(",cancel:");     h += jsStr(T(STR_CANCEL));
   h += F(",install:");    h += jsStr(T(STR_W_FW_INSTALL));
   h += F(",unpub:");      h += jsStr(T(STR_W_FW_UNPUBLISHED));
+  h += F(",norel:");      h += jsStr(T(STR_W_FW_NORELEASE));
   h += F(",unknown:");    h += jsStr(T(STR_W_FW_UNKNOWN));
   h += F(",chrel:");      h += jsStr(T(STR_W_FW_CH_STABLE));
   h += F(",chpre:");      h += jsStr(T(STR_W_FW_CH_PRE));
@@ -425,7 +426,8 @@ static String body() {
          "{method:'POST'}).then(r=>{if(r.status===202&&n<60){again=true;"
          "setTimeout(()=>ghCheck(auto,n+1),1000);return null;}return r.json();}).then(d=>{"
          "if(!d)return;"
-         "if(!d.ok){if(!auto)ghSay(ghErr(d),true);return;}"
+         "if(!d.ok){if(d.error==='norelease'){setLatest('-','');ghSay(G.norel,false);}"
+         "else if(!auto)ghSay(ghErr(d),true);return;}"
          "setLatest(d.tag,d.published);"
          // Either direction is something to act on. Older only ever gets
          // here through a check that answered, so a silent automatic failure
@@ -505,6 +507,19 @@ static String body() {
 static void ghCheckFinish(WebServer &srv);
 static void routesTail(WebServer &srv);
 
+// webJobStart() said no. With the slot free that was the heap: a project's
+// own HTTPS fetch had it for a moment. That passes in seconds, so the page is
+// told to ask again, the same answer as for a job on its way. "busy" was what
+// the Firmware page showed - or, checking by itself, left blank - on a device
+// that fetches over HTTPS all the time.
+static void sendRefused(WebServer &srv) {
+  if (webJobState() == WJS_IDLE) {
+    srv.send(202, "application/json", "{\"ok\":true,\"pending\":true}");
+    return;
+  }
+  srv.send(200, "application/json", "{\"ok\":false,\"error\":\"busy\"}");
+}
+
 static void routes(WebServer &srv) {
   // What GitHub says about one tag: which channel it belongs to, when it was
   // published, and the release notes. The installed version and the one a
@@ -573,7 +588,7 @@ static void routes(WebServer &srv) {
     // loop task, and with it the display, for up to eight seconds when it was
     // made here. 202 says "asked, not answered"; the page asks again.
     if (!webJobStart(WJ_GH_CHECK, nullptr, gh_prerelease)) {
-      srv.send(200, "application/json", "{\"ok\":false,\"error\":\"busy\"}");
+      sendRefused(srv);
       return;
     }
     srv.send(202, "application/json", "{\"ok\":true,\"pending\":true}");
@@ -601,8 +616,12 @@ static void routes(WebServer &srv) {
       srv.send(200, "application/json", "{\"ok\":false,\"error\":\"nowifi\"}");
       return;
     }
-    if (otaBusy() || !webJobStart(WJ_GH_NOTES, tag.c_str(), false)) {
+    if (otaBusy()) {
       srv.send(200, "application/json", "{\"ok\":false,\"error\":\"busy\"}");
+      return;
+    }
+    if (!webJobStart(WJ_GH_NOTES, tag.c_str(), false)) {
+      sendRefused(srv);
       return;
     }
     srv.send(202, "application/json", "{\"ok\":true,\"pending\":true}");

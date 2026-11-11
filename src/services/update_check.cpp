@@ -98,6 +98,9 @@ bool s_scheduled = false;
 // too little for any later HTTPS request. Here every local is gone before the
 // task ends.
 uint8_t runCheck() {
+  // Before the client, so the connection is closed before the slot is given.
+  TlsSlot slot;
+  if (!slot.held()) return RES_FAIL_BEGIN;
   WiFiClientSecure client;
   githubTrust(client);
   HTTPClient http;

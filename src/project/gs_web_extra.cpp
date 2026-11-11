@@ -36,9 +36,39 @@ const char *gsWebExtraUnifi() { return testButton("unifi"); }
 
 // v1 took a box, "lat1,lat2,lon1,lon2". The centre is its middle; the radius
 // reaches its nearest edge, so nothing outside the old box shows up.
+// The browser's position as the centre, asked once (locateOnce() in app.js).
+// Four decimals is about 11 m: plenty for a radius in nautical miles, and no
+// more of the house's position than the display needs.
+static void locateButton(String &s) {
+  s += F("<p class='hint' style='margin-top:14px'>");
+  s += T(STR_P_FL_LOCATE);
+  s += F("</p><div class='inrow'><button class='quiet' id='flloc'>");
+  s += T(STR_P_FL_LOCATE_BTN);
+  s += F("</button><span class='msg' id='flloc-s'></span></div><script>(function(){var L={wait:");
+  s += jsStr(T(STR_P_FL_LOCATE_WAIT));
+  s += F(",denied:");
+  s += jsStr(T(STR_P_FL_LOCATE_DENIED));
+  s += F(",blocked:");
+  s += jsStr(T(STR_P_FL_LOCATE_BLOCKED));
+  s += F(",none:");
+  s += jsStr(T(STR_P_FL_LOCATE_NONE));
+  s += F("};"
+         "$('flloc').addEventListener('click',function(){flash('flloc-s',L.wait,false);"
+         "locateOnce().then(function(p){"
+         "if(p.err==='closed'){flash('flloc-s','',false);return;}"
+         "if(p.err){flash('flloc-s',L[p.err]||L.none,true,8000);return;}"
+         "Promise.all([post('/api/settings','fl_lat='+p.lat.toFixed(4)),"
+         "post('/api/settings','fl_lon='+p.lon.toFixed(4))]).then(function(rs){"
+         "var ok=rs.every(function(x){return x.ok;});"
+         "flash('flloc-s',ok?WS.ok:WS.err,!ok,5000);if(ok)load();});});});})();"
+         "</script>");
+}
+
 const char *gsWebExtraFlights() {
   static String s;
-  s = F("<p class='hint' style='margin-top:14px'>");
+  s = "";
+  locateButton(s);
+  s += F("<p class='hint' style='margin-top:14px'>");
   s += T(STR_P_FL_CONVERT);
   s += F("</p><div class='inrow'><input id='flbox' type='text' placeholder='51.5672,51.4131,-0.4146,0.1107'>"
          "<button class='quiet' id='flconv'>");

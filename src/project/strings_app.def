@@ -122,6 +122,12 @@ S(STR_P_MQTT_DOWN,        "not connected")
 S(STR_P_MQTT_OFF,         "off")
 
 // ---- Flight area converter (Flights section) ----
+S(STR_P_FL_LOCATE,        "Or let this browser say where it is, once:")
+S(STR_P_FL_LOCATE_BTN,    "Use my location")
+S(STR_P_FL_LOCATE_WAIT,   "Waiting for the location window...")
+S(STR_P_FL_LOCATE_DENIED, "Location was not allowed.")
+S(STR_P_FL_LOCATE_BLOCKED,"The browser blocked the location window. Allow pop-ups for this page and try again.")
+S(STR_P_FL_LOCATE_NONE,   "The browser could not find a location.")
 S(STR_P_FL_CONVERT,       "Coming from v1? Paste its flight area (lat1,lat2,lon1,lon2) to fill in the centre and radius:")
 S(STR_P_FL_CONVERT_BTN,   "Convert")
 

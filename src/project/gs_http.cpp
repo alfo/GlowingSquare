@@ -6,11 +6,10 @@
 
 #include "app_config.h"
 #include "services/github_release.h"   // githubTrust(): the IDF certificate bundle
+#include "services/worker_heap.h"      // TlsSlot
 
-int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
-               char *err, size_t err_n) {
-  if (err && err_n) err[0] = '\0';
-  const bool tls = strncmp(req.url, "https://", 8) == 0;
+static int request(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
+                   char *err, size_t err_n, bool tls) {
   WiFiClientSecure secure;
   WiFiClient plain;
   if (tls) {
@@ -74,4 +73,21 @@ int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
     return -2;
   }
   return code;
+}
+
+// HTTPS waits its turn: the Firmware page's GitHub check and this fetch each
+// need some 40 kB, and the second of two at once failed to connect. The slot
+// is taken out here so the clients inside request() are gone before it is
+// handed on.
+int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
+               char *err, size_t err_n) {
+  if (err && err_n) err[0] = '\0';
+  const bool tls = strncmp(req.url, "https://", 8) == 0;
+  if (!tls) return request(req, out, filter, err, err_n, false);
+  TlsSlot slot;
+  if (!slot.held()) {
+    snprintf(err, err_n, "another HTTPS request held on");
+    return -4;
+  }
+  return request(req, out, filter, err, err_n, true);
 }

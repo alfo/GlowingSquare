@@ -14,6 +14,7 @@
 #include "app_config.h"
 #include "services/ota_state.h"
 #include "services/ota_ui.h"
+#include "services/worker_heap.h"
 
 #define GH_REPO APP_GH_REPO
 // The release asset the device flashes, see githubFlashTag(): one per env.
@@ -53,6 +54,13 @@ void githubTrust(WiFiClientSecure &client) {
 // when the request or the body did not make it; body holds the whole answer
 // only on 200.
 static int ghApiAttempt(const String &url, String &body) {
+  // Declared before the client, so the connection is closed before the slot
+  // is handed on.
+  TlsSlot slot;
+  if (!slot.held()) {
+    logSDf("GitHub API: %s - another TLS connection held on", url.c_str());
+    return HTTPC_ERROR_CONNECTION_REFUSED;
+  }
   WiFiClientSecure client;
   githubTrust(client);
   HTTPClient http;
@@ -115,14 +123,21 @@ bool githubLatestTag(bool prerelease, char *tag, size_t tag_len,
   if (err && err_len) err[0] = '\0';
 
   // per_page caps the list. Unbounded it answers with every release ever cut -
-  // 109 KB at the time of writing. The filter below keeps the parsed document
-  // small; the body itself lands in PSRAM.
+  // 109 KB at the time of writing. One is enough: the list is newest first,
+  // and drafts, the only entries the loop below skips, are shown to signed-in
+  // callers only, which the device never is. Three releases came to some
+  // 20 KB, which a board without PSRAM could not hold next to the open TLS
+  // connection ("body cut off", a stream write error), and the page's
+  // "Latest" stayed empty.
   String url = prerelease
-    ? "https://api.github.com/repos/" GH_REPO "/releases?per_page=3"
+    ? "https://api.github.com/repos/" GH_REPO "/releases?per_page=1"
     : "https://api.github.com/repos/" GH_REPO "/releases/latest";
   const uint32_t heap_before = ESP.getFreeHeap();
   String payload;
   const int code = ghApiGet(url, payload, err, err_len);
+  // releases/latest answers 404 while only pre-releases exist: nothing
+  // published on this channel, which the page says in words.
+  if (code == 404 && !prerelease && err && err_len) snprintf(err, err_len, "%s", "norelease");
   if (code != 200) return false;
   const int    payload_len = payload.length();
   const uint32_t heap_parse = ESP.getFreeHeap();
@@ -334,6 +349,15 @@ bool githubFlashTag(const char *tag, const char *sha256_hex,
   // leaves it set, because the caller is about to restart.
   gh_flash_active = true;
 
+  // This runs on the loop task, which the download holds anyway: waiting a
+  // few seconds here for a project's fetch to finish is part of the same
+  // pause, and starting without the slot is the failure the slot prevents.
+  TlsSlot slot;
+  if (!slot.held()) {
+    gh_flash_active = false;
+    if (err && err_len) snprintf(err, err_len, "%s", "Busy, try again");
+    return false;
+  }
   WiFiClientSecure client;
   githubTrust(client);
   HTTPClient http;

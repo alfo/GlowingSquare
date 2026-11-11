@@ -154,7 +154,7 @@ static String body() {
     if (ss.web_extra) h += ss.web_extra();
     h += F("</div>");
   }
-  h += F("</div><p class='msg' id='os-s'></p>");
+  h += F("</div><p class='msg toast' id='os-s' role='status'></p>");
 
   h += F("<script>");
   h += webShellJsStrings();
@@ -179,7 +179,8 @@ static String body() {
          "if(x!==undefined)e.textContent=x;return e;}"
          "function send(d,v,undo){return post('/api/settings',d.id+'='+v).then(r=>{"
          "if(!r.ok){if(undo)undo();flash('os-s',r.text||WS.err,true,5000);return r;}"
-         "flash('os-s',d.reboot?WS.ok+' '+M.reboot:WS.ok,false,5000);return r;});}"
+         "const m=d.name+': '+(r.text||WS.ok);"
+         "flash('os-s',d.reboot?m+' '+M.reboot:m,false,4000);return r;});}"
          // A field and its own Save button, for text, numbers and secrets.
          "function field(d,inp,get){const w=el('div','inrow');w.appendChild(inp);"
          "const b=el('button','quiet',M.save);b.addEventListener('click',()=>{"

@@ -307,6 +307,16 @@ static const char APP_CSS[] PROGMEM =
       ".ask p{color:var(--ink);font-size:15px;line-height:1.5;white-space:pre-line;"
       "overflow-wrap:anywhere;margin-bottom:20px}"
       ".ask .inrow{justify-content:flex-end}"
+      // A message line pinned to the bottom of the window, for a page whose
+      // controls sit further down than its own line: the Settings page, where
+      // a Save at the top of a long list reported to a line off the screen.
+      ".msg.toast{position:fixed;left:50%;bottom:calc(var(--vis-bot,0px) + 20px);"
+      "transform:translateX(-50%);z-index:90;max-width:calc(100% - 32px);"
+      "padding:10px 18px;border-radius:10px;font-size:14px;min-height:0;"
+      "background:var(--surface);border:1px solid var(--accent-line);"
+      "box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:none}"
+      ".msg.toast.bad{border-color:var(--bad-line)}"
+      ".msg.toast:empty{display:none}"
 ;
 
 const char* webStaticVersion() { return FW_VERSION; }
@@ -335,7 +345,7 @@ static const char APP_JS[] PROGMEM =
   // clearing it.
   "function flash(id,t,bad,ms,after){"
   "var e=$(id);if(!e)return;"
-  "e.textContent=t;e.className='msg'+(bad?' bad':'');"
+  "e.textContent=t;e.classList.add('msg');e.classList.toggle('bad',!!bad);"
   "if(e._ft){clearTimeout(e._ft);e._ft=0;}"
   "if(ms)e._ft=setTimeout(function(){e._ft=0;"
   "if(after)after();else e.textContent='';},ms);}\n"
@@ -401,6 +411,33 @@ static const char APP_JS[] PROGMEM =
   "return new Promise(function(res){ASK.done=function(v){ASK.done=null;"
   "ASK.box.classList.remove('open');"
   "if(prev&&prev.focus){try{prev.focus();}catch(x){}}res(v);};});}\n"
+
+  // The browser's position, once, on a click. A browser hands a position
+  // only to a secure page (HTTPS or localhost) and the device serves plain
+  // HTTP, so the question is asked by locate.html on the project's Pages site
+  // (flasher/locate.html), in a window of its own, which posts the answer
+  // back here. Resolves {lat,lon} or {err:'denied'|'blocked'|'closed'|'none'};
+  // never rejects. Nothing keeps watching the position afterwards.
+  "var PAGES='" APP_PAGES_URL "';\n"
+  "function locateOnce(){return new Promise(function(res){"
+  "if(window.isSecureContext&&navigator.geolocation){"
+  "navigator.geolocation.getCurrentPosition(function(p){"
+  "res({lat:p.coords.latitude,lon:p.coords.longitude});},"
+  "function(e){res({err:e&&e.code===1?'denied':'none'});},"
+  "{timeout:20000,maximumAge:600000});return;}"
+  "var org=null;try{org=new URL(PAGES).origin;}catch(x){}"
+  "if(!org){res({err:'none'});return;}"
+  "var w=window.open(PAGES+'locate.html?from='+encodeURIComponent(location.origin),"
+  "'locate','width=440,height=560');"
+  "if(!w){res({err:'blocked'});return;}"
+  "var t=setInterval(function(){if(w.closed)done({err:'closed'});},500);"
+  "function on(e){var d=e.data;"
+  "if(e.origin!==org||e.source!==w||!d||d.type!=='locate')return;"
+  "if(typeof d.lat==='number'&&typeof d.lon==='number')done({lat:d.lat,lon:d.lon});"
+  "else done({err:d.err==='denied'?'denied':'none'});}"
+  "function done(r){clearInterval(t);window.removeEventListener('message',on);"
+  "try{w.close();}catch(x){}res(r);}"
+  "window.addEventListener('message',on);});}\n"
 
   // Light or dark: data-pref is the stored choice (dark, light, auto), set
   // by web_shell.cpp. auto follows the browser and keeps following it. Run

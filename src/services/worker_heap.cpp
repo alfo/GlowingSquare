@@ -28,3 +28,31 @@ bool workerHeapReady(const char* who, uint32_t floor_bytes, uint32_t stack_bytes
   }
   return false;
 }
+
+// Made on first use. Two tasks can get there together, so the one that loses
+// the race throws its own away.
+static SemaphoreHandle_t s_tls_slot = nullptr;
+static portMUX_TYPE      s_tls_mux  = portMUX_INITIALIZER_UNLOCKED;
+
+static SemaphoreHandle_t tlsSlot() {
+  if (s_tls_slot) return s_tls_slot;
+  SemaphoreHandle_t made = xSemaphoreCreateBinary();
+  if (!made) return nullptr;
+  xSemaphoreGive(made);
+  portENTER_CRITICAL(&s_tls_mux);
+  if (!s_tls_slot) { s_tls_slot = made; made = nullptr; }
+  portEXIT_CRITICAL(&s_tls_mux);
+  if (made) vSemaphoreDelete(made);
+  return s_tls_slot;
+}
+
+bool tlsSlotTake(uint32_t wait_ms) {
+  SemaphoreHandle_t s = tlsSlot();
+  // No semaphore means no heap for one either: going ahead is no worse.
+  if (!s) return true;
+  return xSemaphoreTake(s, pdMS_TO_TICKS(wait_ms)) == pdTRUE;
+}
+
+void tlsSlotGive() {
+  if (s_tls_slot) xSemaphoreGive(s_tls_slot);
+}
