@@ -138,8 +138,9 @@ def main():
     vpath.write_text(json.dumps(vdata, indent=2) + "\n")
 
     if publish_flasher:
+        accent = {"dark": config_value("APP_ACCENT_DARK"), "light": config_value("APP_ACCENT_LIGHT")}
         (a.pages / "boards.json").write_text(json.dumps(
-            {"app": app_name, "version": version, "boards": boards}, indent=2) + "\n")
+            {"app": app_name, "version": version, "accent": accent, "boards": boards}, indent=2) + "\n")
         shutil.copy2(ROOT / "flasher/index.html", a.pages / "index.html")
         for extra in (ROOT / "flasher").glob("*"):
             if extra.name != "index.html" and extra.is_file():
