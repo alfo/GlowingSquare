@@ -9,6 +9,7 @@
 #include "app/app_state.h"
 #include "app_config.h"
 #include "hardware/sd_logger.h"
+#include "services/brownout_guard.h"
 #include "services/github_release.h"
 #include "services/partition_layout.h"
 #include "services/ota_state.h"
@@ -114,6 +115,7 @@ void otaWebGithubTick() {
   // gets told an image is being written, and the touch below it stops
   // reaching a screen that is about to be replaced.
   otaUiShow();
+  brownoutGuardHold(true);
 
   char err[80] = "";
   if (githubFlashTag(gh_web_flash_tag, otaExpectedSha(gh_web_flash_tag),
@@ -125,8 +127,10 @@ void otaWebGithubTick() {
     ESP.restart();
   }
   otaUiHide();
+  brownoutGuardHold(false);
   logSDf("OTA: install failed - %s", err);
   otaUiFailed();
+  brownoutGuardHold(false);
 }
 
 static String body() {
@@ -738,6 +742,7 @@ static void routesTail(WebServer &srv) {
         ESP.restart();
       } else {
         otaUiFailed();
+  brownoutGuardHold(false);
       }
     },
     // Chunk handler.
@@ -790,6 +795,7 @@ static void routesTail(WebServer &srv) {
         // the loop, touch included, and a frozen home screen for two minutes
         // looked like a hung device (Nikolai, 26.09.2026).
         otaUiShow();
+  brownoutGuardHold(true);
         otaUiStatus(T(STR_OTA_UPLOADING));
         otaUiPump();
       } else if (refused || failed) {
@@ -807,8 +813,10 @@ static void routesTail(WebServer &srv) {
         ota_upload_done   = 0;
         ota_upload_total  = 0;
         otaUiHide();
+  brownoutGuardHold(false);
         logSD("OTA: upload aborted by the client");
         otaUiFailed();
+  brownoutGuardHold(false);
       } else if (upload.status == UPLOAD_FILE_WRITE) {
         if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
           logSDf("OTA: write failed after %u bytes, error %u",
@@ -817,7 +825,9 @@ static void routesTail(WebServer &srv) {
           ota_upload_active = false;
           failed = true;
           otaUiHide();
+  brownoutGuardHold(false);
           otaUiFailed();
+  brownoutGuardHold(false);
           return;
         }
         ota_upload_done += upload.currentSize;
@@ -838,6 +848,7 @@ static void routesTail(WebServer &srv) {
           logSDf("OTA: browser upload complete, %u bytes", (unsigned)upload.totalSize);
         } else {
           otaUiHide();
+  brownoutGuardHold(false);
           logSDf("OTA: end() failed after %u bytes, error %u",
                  (unsigned)upload.totalSize, (unsigned)Update.getError());
         }

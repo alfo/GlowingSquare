@@ -44,7 +44,7 @@ void matrixShow() {
 }
 
 void matrixSetBrightness(uint8_t level) {
-  if (s_dma) s_dma->setBrightness8(level);
+  if (s_dma) s_dma->setBrightness8(matrixPerceptual(level));
 }
 
 const char *matrixDriverName() { return "HUB75 DMA"; }

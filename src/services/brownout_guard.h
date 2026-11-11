@@ -23,3 +23,9 @@
 void brownoutGuardBegin();
 // From the loop: switches the detector back on when the time is up.
 void brownoutGuardTick();
+
+// Around a firmware transfer: sustained WiFi plus continuous flash writes
+// are the heaviest load the board sees. Safe to ride out: an image only
+// becomes active once written whole and verified, so a reset mid-transfer
+// leaves the running firmware as it was.
+void brownoutGuardHold(bool on);

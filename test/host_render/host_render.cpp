@@ -161,6 +161,13 @@ int main(int argc, char **argv) {
     assert(pass.done());                                   // fits: drawn still, no scrolling
   }
 
+  // ---- Brightness as people see it ----
+  assert(matrixPerceptual(0) == 0);
+  assert(matrixPerceptual(1) == 1);                      // dim, never dark
+  assert(matrixPerceptual(255) == 255);
+  assert(matrixPerceptual(128) > 50 && matrixPerceptual(128) < 60);   // half looks half
+  for (int v = 1; v < 255; v++) assert(matrixPerceptual(v) <= matrixPerceptual(v + 1));
+
   printf("host render: ok\n");
   return 0;
 }

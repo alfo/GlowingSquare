@@ -102,6 +102,6 @@ void matrixShow() {
   display.showBuffer();
 }
 
-void matrixSetBrightness(uint8_t level) { display.setBrightness(level); }
+void matrixSetBrightness(uint8_t level) { display.setBrightness(matrixPerceptual(level)); }
 
 const char *matrixDriverName() { return "PxMatrix"; }

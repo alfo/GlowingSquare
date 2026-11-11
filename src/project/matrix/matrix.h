@@ -31,8 +31,14 @@ bool matrixBegin();
 // The canvas to the panel. Cheap enough to call every frame.
 void matrixShow();
 
-// 0..255, applied by the driver (PxMatrix: on-time, DMA: OE duty).
+// 0..255 as people see it: 128 looks half as bright as 255. The driver gets
+// matrixPerceptual(level), since LED light output is linear in on-time but
+// the eye is not: halving the on-time barely shows at the top of the range.
 void matrixSetBrightness(uint8_t level);
+
+// The curve: a 2.2 power, the gamma of the eye. 0 stays off; any other level
+// stays at least 1, so a low setting never goes dark.
+uint8_t matrixPerceptual(uint8_t level);
 
 // Panel refreshes since boot (PxMatrix: one colour plane each), for the log.
 // 0 on drivers that refresh by DMA.
