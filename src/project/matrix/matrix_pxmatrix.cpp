@@ -42,6 +42,9 @@ static PxMATRIX display(MATRIX_W, MATRIX_H, PIN_LAT, PIN_OE, PIN_A, PIN_B, PIN_C
 static hw_timer_t   *s_timer = nullptr;
 static TaskHandle_t  s_task  = nullptr;
 static volatile uint32_t s_refreshes = 0;
+// The row pair matrixHold() keeps lit, or -1 while the panel is refreshed.
+static volatile int16_t s_hold_row = -1;
+static uint8_t s_level = 255;   // perceptual brightness, as the driver got it
 
 static void IRAM_ATTR onRefreshTimer() {
   BaseType_t woken = pdFALSE;
@@ -52,6 +55,7 @@ static void IRAM_ATTR onRefreshTimer() {
 static void refreshTask(void *) {
   for (;;) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    if (s_hold_row >= 0) continue;   // the panel is held: its rows are latched
     display.display((uint16_t)g_px_on_us);
     s_refreshes = s_refreshes + 1;
   }
@@ -94,14 +98,83 @@ void matrixApplyTiming() {
   applyMuxDelay();
 }
 
+// ---- held, while firmware is written ----------------------------------------
+// The refresh stops and one row pair stays latched in the panel's shift
+// registers. OE, which lights it, is driven by the LEDC peripheral instead of
+// the refresh task, so it stays steady however long a flash write stalls the
+// CPU. The PWM runs above hearing, so the supply has nothing to sing at.
+#define HOLD_PWM_HZ    10000
+#define HOLD_PWM_BITS  12
+#define HOLD_PWM_FULL  (1u << HOLD_PWM_BITS)
+#define HOLD_ROWS      (MATRIX_H / 2)   // 1/16 scan: address y lights y and y + 16
+
+// The fewest counts that still light: the core turns one short of full into
+// always high, which is dark.
+#define HOLD_MIN_COUNTS  2
+
+// How long OE is low per PWM period, in counts: the share of time a full
+// pixel is lit in normal refresh, so a held row is as bright as it was. Each
+// refresh lights a row for on_us * 2^plane / 2 in one colour plane, a plane
+// per period: (2^planes - 1) / 2 * on_us over `planes` periods.
+static uint32_t holdOnCounts() {
+  if (s_level == 0) return 0;
+  const uint32_t planes = PxMATRIX_COLOR_DEPTH;
+  const uint64_t num = (uint64_t)HOLD_PWM_FULL * ((1u << planes) - 1u) *
+                       (uint32_t)g_px_on_us * s_level;
+  const uint64_t den = 2ull * planes * (uint32_t)g_px_period_us * 255u;
+  uint32_t on = den ? (uint32_t)(num / den) : 0;
+  if (on < HOLD_MIN_COUNTS) on = HOLD_MIN_COUNTS;
+  if (on > HOLD_PWM_FULL) on = HOLD_PWM_FULL;
+  return on;
+}
+
+// OE is active low: the PWM is high, panel dark, for the rest of the period.
+static void holdApplyLevel() { ledcWrite(PIN_OE, HOLD_PWM_FULL - holdOnCounts()); }
+
+bool matrixHold(int16_t y) {
+  if (!s_timer) return false;
+  if (y < 0) {
+    if (s_hold_row < 0) return true;
+    ledcDetach(PIN_OE);
+    pinMode(PIN_OE, OUTPUT);
+    digitalWrite(PIN_OE, HIGH);
+    s_hold_row = -1;
+    timerStart(s_timer);
+    return true;
+  }
+  // From the loop task, on the refresh task's core, where the refresh task
+  // outranks it: it is not halfway through a refresh while this runs, and
+  // the flag keeps a refresh already asked for from running at all.
+  timerStop(s_timer);
+  s_hold_row = (int16_t)(y % HOLD_ROWS);
+  digitalWrite(PIN_OE, HIGH);
+  if (!ledcAttach(PIN_OE, HOLD_PWM_HZ, HOLD_PWM_BITS)) {
+    // Refreshed as before; the caller darkens it rather than let it strobe.
+    pinMode(PIN_OE, OUTPUT);
+    digitalWrite(PIN_OE, HIGH);
+    s_hold_row = -1;
+    timerStart(s_timer);
+    return false;
+  }
+  ledcWrite(PIN_OE, HOLD_PWM_FULL);   // dark until the row is latched
+  display.holdRow((uint8_t)s_hold_row);
+  holdApplyLevel();
+  return true;
+}
+
 void matrixShow() {
   const uint16_t *px = matrixCanvas().getBuffer();
   for (int16_t y = 0; y < MATRIX_H; y++)
     for (int16_t x = 0; x < MATRIX_W; x++)
       display.drawPixel(x, y, px[y * MATRIX_W + x]);
   display.showBuffer();
+  if (s_hold_row >= 0) display.holdRow((uint8_t)s_hold_row);
 }
 
-void matrixSetBrightness(uint8_t level) { display.setBrightness(matrixPerceptual(level)); }
+void matrixSetBrightness(uint8_t level) {
+  s_level = matrixPerceptual(level);
+  display.setBrightness(s_level);
+  if (s_hold_row >= 0) holdApplyLevel();
+}
 
 const char *matrixDriverName() { return "PxMatrix"; }

@@ -47,6 +47,15 @@ uint32_t matrixRefreshCount();
 // PxMatrix builds: apply a changed refresh period (g_px_period_us) now.
 void matrixApplyTiming();
 
+// While firmware is written. A flash write stalls the CPU, and a panel the
+// CPU multiplexes strobes through every stall. Held at row y, the PxMatrix
+// build stops multiplexing and keeps rows y and y + 16 lit from the hardware
+// alone, at the brightness set; matrixShow() then updates those two rows and
+// nothing else. y < 0 lets go and the whole canvas shows again. The DMA
+// build refreshes without the CPU, so it shows the whole canvas throughout.
+// False when the panel could not be held: it is then best left dark.
+bool matrixHold(int16_t y);
+
 // Which driver this build has, for the Status page and the log.
 const char *matrixDriverName();
 

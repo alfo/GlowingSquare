@@ -29,6 +29,20 @@ void drawIcon(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *img);
 // The red pixel in the bottom right corner: offline, but powered.
 void drawOffline();
 
+// A firmware update: one line across the panel, filled from the left as the
+// image arrives, over a dotted track that shows where it ends. One line
+// because that is all a PxMatrix panel can keep lit while flash is written
+// (matrixHold()), and saturated colours because a held row shows only those.
+constexpr int16_t UPDATE_BAR_Y = 15;
+constexpr int16_t UPDATE_BAR_X = 4;
+constexpr int16_t UPDATE_BAR_W = MATRIX_W - 2 * UPDATE_BAR_X;
+
+// Pixels of the bar filled for this much of the image. total 0 (size not
+// known): none, the track alone.
+int16_t updateBarFill(uint32_t done, uint32_t total);
+// The whole screen: dark but for the bar, `filled` pixels of it lit.
+void drawUpdateBar(int16_t filled);
+
 // One row of "static prefix, then text scrolling past it". start() draws the
 // first frame; tick() moves it on by a pixel when its step is due and
 // returns true when it drew; done() once it has snapped back.

@@ -38,6 +38,25 @@ void drawOffline() {
   cv().drawPixel(MATRIX_W - 1, MATRIX_H - 1, rgb565(255, 0, 0));
 }
 
+int16_t updateBarFill(uint32_t done, uint32_t total) {
+  if (total == 0) return 0;
+  if (done >= total) return UPDATE_BAR_W;
+  return (int16_t)((uint64_t)done * UPDATE_BAR_W / total);
+}
+
+// Every other pixel of the track, so the empty part reads as a line still to
+// be filled rather than as a gap.
+#define UPDATE_TRACK_STEP 2
+
+void drawUpdateBar(int16_t filled) {
+  if (filled < 0) filled = 0;
+  if (filled > UPDATE_BAR_W) filled = UPDATE_BAR_W;
+  cv().fillScreen(0);
+  for (int16_t i = filled; i < UPDATE_BAR_W; i++)
+    if ((i % UPDATE_TRACK_STEP) == 0) cv().drawPixel(UPDATE_BAR_X + i, UPDATE_BAR_Y, rgb565(0, 0, 255));
+  if (filled > 0) cv().drawFastHLine(UPDATE_BAR_X, UPDATE_BAR_Y, filled, rgb565(0, 255, 255));
+}
+
 // ---------------------------------------------------------------------------
 
 void ScrollRow::drawAt(int16_t x) {

@@ -106,6 +106,7 @@ static bool s_matrix_ok = false;
 static uint8_t s_shown_mode = 255;
 static uint8_t s_shown_party = PARTY_OFF;
 static bool s_shown_offline = false;
+static bool s_redraw = false;   // the mode draws again: an update bar covered it
 
 // The panel starts after the WiFi radio, as in v1. The radio's start-up
 // calibration draws a spike that, on top of a refreshing panel, browned these
@@ -177,6 +178,14 @@ static void projectLoop() {
       s_shown_mode = g_mode;
       s_shown_party = PARTY_OFF;
       partyFrame(now);   // lets party mode note that it ended
+      modeOps(g_mode).enter();
+      dirty = true;
+    }
+    if (s_redraw) {
+      // After a failed update: the frame the bar covered, then the offline
+      // dot again if it belongs there.
+      s_redraw = false;
+      s_shown_offline = false;
       modeOps(g_mode).enter();
       dirty = true;
     }
@@ -399,19 +408,52 @@ const size_t         PROJECT_WEB_PAGE_COUNT = 0;
 
 // ---- the panel during a firmware update -------------------------------------
 // Writing flash pauses code running from flash, the panel refresh included,
-// and a stalled refresh leaves one row lit: the panel strobes for the whole
-// transfer. Dark is calmer, and says that something is happening. These
-// replace the core's weak no-ops (services/ota_ui.h).
+// and a refresh that stalls strobes. So the panel is held (matrixHold()): one
+// line, lit by the hardware, that fills as the image arrives. The transfer
+// holds the loop, so these draw and return. They replace the core's weak
+// no-ops (services/ota_ui.h).
+
+static bool    s_ota_shown  = false;
+static bool    s_ota_held   = false;
+static int16_t s_ota_filled = -1;     // what the bar last showed
+
+static void otaBar(int16_t filled) {
+  if (!s_ota_shown || filled == s_ota_filled) return;
+  s_ota_filled = filled;
+  drawUpdateBar(filled);
+  matrixShow();
+}
 
 void otaUiShow() {
-  matrixSetBrightness(0);
+  if (!s_matrix_ok || s_ota_shown) return;
+  s_ota_shown  = true;
+  s_ota_filled = -1;
+  otaBar(0);
+  s_ota_held = matrixHold(UPDATE_BAR_Y);
+  if (!s_ota_held) {
+    // Dark, then: calmer than a strobing panel, and still says something is on.
+    matrixSetBrightness(0);
+    logSD("Update: the panel could not be held, dark until the end");
+  }
+}
+
+void otaUiProgress(uint32_t done, uint32_t total) { otaBar(updateBarFill(done, total)); }
+
+// Written and checked: the device restarts next, with the line full.
+void otaUiStatus(const char *text) {
+  if (text && strcmp(text, T(STR_OTA_SUCCESS)) == 0) otaBar(UPDATE_BAR_W);
 }
 
 void otaUiHide() {
+  if (!s_ota_shown) return;
+  s_ota_shown = false;
+  if (s_ota_held) matrixHold(-1);
+  s_ota_held = false;
   matrixSetBrightness(s_brightness);
+  s_redraw = true;
 }
 
 void otaUiFailed() {
-  matrixSetBrightness(s_brightness);
+  otaUiHide();
   logSD("Update failed: display back on");
 }

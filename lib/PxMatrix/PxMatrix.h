@@ -197,6 +197,11 @@ class PxMATRIX : public Adafruit_GFX {
   // When using double buffering, this displays the draw buffer
   inline void showBuffer();
 
+  // GS: shifts row pair i of the shown buffer's top colour plane into the
+  // panel and latches it, without lighting it: the caller drives OE. For a
+  // panel held still while the CPU cannot refresh it (firmware being written).
+  inline void holdRow(uint8_t i);
+
   // Control the minimum color values that result in an active pixel
   inline void setColorOffset(uint8_t r, uint8_t g,uint8_t b);
 
@@ -607,6 +612,20 @@ inline void PxMATRIX::drawPixel(int16_t x, int16_t y, uint16_t color) {
 
 inline void PxMATRIX::showBuffer() {
   _active_buffer=!_active_buffer;
+}
+
+// GS: see the declaration. The top plane is the one a full-intensity pixel
+// lights in, so a held row shows saturated colours as they are.
+inline void PxMATRIX::holdRow(uint8_t i) {
+  if (i >= _row_pattern) return;
+  uint8_t (*bufferp)[PxMATRIX_COLOR_DEPTH][buffer_size] = &PxMATRIX_buffer;
+#ifdef PxMATRIX_double_buffer
+  bufferp = _active_buffer ? &PxMATRIX_buffer2 : &PxMATRIX_buffer;
+#endif
+  set_mux(i);
+  SPI_TRANSFER(&(*bufferp)[PxMATRIX_COLOR_DEPTH - 1][i * _send_buffer_size], _send_buffer_size);
+  digitalWrite(_LATCH_PIN, HIGH);
+  digitalWrite(_LATCH_PIN, LOW);
 }
 
 inline void PxMATRIX::setColorOffset(uint8_t r, uint8_t g,uint8_t b)

@@ -145,6 +145,32 @@ int main(int argc, char **argv) {
   dump("offline");
   assert(px(63, 31) == rgb565(255, 0, 0));
 
+  // ---- Firmware update: one held line, filling from the left ----
+  {
+    assert(updateBarFill(0, 0) == 0);                    // size not known: track only
+    assert(updateBarFill(0, 1000) == 0);
+    assert(updateBarFill(500, 1000) == UPDATE_BAR_W / 2);
+    assert(updateBarFill(1000, 1000) == UPDATE_BAR_W);
+    assert(updateBarFill(1200, 1000) == UPDATE_BAR_W);   // the multipart envelope overshoots
+    drawUpdateBar(0);
+    dump("update_start");
+    drawUpdateBar(updateBarFill(3, 10));
+    dump("update_30");
+    const int16_t filled = updateBarFill(3, 10);
+    for (int16_t y = 0; y < MATRIX_H; y++)
+      for (int16_t x = 0; x < MATRIX_W; x++) {
+        const uint16_t c = px(x, y);
+        if (y != UPDATE_BAR_Y) { assert(c == 0); continue; }   // the held row alone
+        const int16_t i = x - UPDATE_BAR_X;
+        if (i < 0 || i >= UPDATE_BAR_W) assert(c == 0);
+        else if (i < filled)            assert(c == rgb565(0, 255, 255));
+        else                            assert(c == ((i % 2) == 0 ? rgb565(0, 0, 255) : 0));
+      }
+    drawUpdateBar(UPDATE_BAR_W);
+    dump("update_done");
+    assert(px(UPDATE_BAR_X + UPDATE_BAR_W - 1, UPDATE_BAR_Y) == rgb565(0, 255, 255));
+  }
+
   // ---- ScrollRow: hold still, then scroll; text that fits never moves ----
   {
     matrixCanvas().fillScreen(0);

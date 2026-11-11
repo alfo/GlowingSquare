@@ -52,3 +52,7 @@ const char *matrixDriverName() { return "HUB75 DMA"; }
 uint32_t matrixRefreshCount() { return 0; }
 
 void matrixApplyTiming() {}   // the DMA refresh has no software timing
+
+// The DMA engine reads the frame from RAM by itself: a flash write cannot
+// stall it, so there is nothing to hold.
+bool matrixHold(int16_t) { return true; }
