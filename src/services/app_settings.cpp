@@ -73,6 +73,11 @@ void saveWifiCredentials(const char* ssid, const char* pass) {
   copyBounded(cfg_wifi_password, sizeof(cfg_wifi_password), pass);
   prefsPutString("wifi_ssid", cfg_wifi_ssid);
   prefsPutString("wifi_pass", cfg_wifi_password);
+  // On flash now, not at the end of the loop pass: every caller starts the
+  // radio next, and on a supply that sags under it the board can brown out
+  // before the pass ends. The credentials were then lost and the device came
+  // back up in the setup portal, as if the password had been wrong.
+  prefsFlush();
   Serial.printf("WiFi saved: SSID=%s\n", cfg_wifi_ssid);
 }
 
