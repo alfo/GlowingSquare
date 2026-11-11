@@ -33,9 +33,9 @@ void drawOffline();
 // image arrives, over a dotted track that shows where it ends. One line
 // because that is all a PxMatrix panel can keep lit while flash is written
 // (matrixHold()), and saturated colours because a held row shows only those.
-constexpr int16_t UPDATE_BAR_Y = 15;
-constexpr int16_t UPDATE_BAR_X = 4;
-constexpr int16_t UPDATE_BAR_W = MATRIX_W - 2 * UPDATE_BAR_X;
+constexpr int16_t UPDATE_BAR_Y = MATRIX_H - 1;   // the bottom row
+constexpr int16_t UPDATE_BAR_X = 0;
+constexpr int16_t UPDATE_BAR_W = MATRIX_W;        // edge to edge
 
 // Pixels of the bar filled for this much of the image. total 0 (size not
 // known): none, the track alone.
