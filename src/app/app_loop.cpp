@@ -12,6 +12,7 @@
 #include "hardware/flash_log.h"
 #include "hardware/sd_logger.h"
 #include "services/breadcrumb.h"
+#include "services/brownout_guard.h"
 #include "services/device_name.h"
 #include "services/github_release.h"
 #include "services/improv_serial.h"
@@ -269,6 +270,7 @@ void appLoop() {
 
   stackWatermarkTick();
   heartbeatTick();
+  brownoutGuardTick();
 
   // Before the watchdog, so a connect attempt from the browser is already
   // known to be running when the watchdog asks.

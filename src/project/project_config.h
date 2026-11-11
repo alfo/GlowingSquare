@@ -26,6 +26,9 @@
 // spikes sagged it far enough to brown the board out. 15 dBm is plenty
 // indoors.
 #define APP_WIFI_TX_POWER WIFI_POWER_15dBm
+// And the start-up spike alone still browned some boards out on every boot:
+// the detector stays off for the radio's first seconds (services/brownout_guard.h).
+#define APP_BROWNOUT_GUARD_MS 6000
 
 // The device shows the setup WiFi's name and password on the matrix itself,
 // so the network does not have to be open.

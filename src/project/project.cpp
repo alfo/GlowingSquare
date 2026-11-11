@@ -1,6 +1,7 @@
 // Glowing Square 2: the hooks the template core calls, the frame loop, and
 // the routes and Status card the web interface shows for the matrix.
 #include <Arduino.h>
+#include <WiFi.h>
 
 #include "app/app_hooks.h"
 #include "app/app_state.h"
@@ -106,21 +107,49 @@ static uint8_t s_shown_mode = 255;
 static uint8_t s_shown_party = PARTY_OFF;
 static bool s_shown_offline = false;
 
-static void projectSetup() {
+// The panel starts after the WiFi radio, as in v1. The radio's start-up
+// calibration draws a spike that, on top of a refreshing panel, browned these
+// boards out on every boot, endlessly on some supplies. The radio settles
+// within a second or two; the panel waits this long after it came on.
+#define MATRIX_AFTER_RADIO_MS  2000
+
+static bool     s_matrix_started = false;
+static uint32_t s_radio_on_ms = 0;
+
+static void matrixStart() {
+  if (s_matrix_started) return;
+  s_matrix_started = true;
   s_matrix_ok = matrixBegin();
   logSDf("Matrix: %s %s", matrixDriverName(), s_matrix_ok ? "up" : "FAILED");
+  matrixSetBrightness(s_brightness);
+  if (s_matrix_ok) matrixShow();
+}
+
+// From the loop: start the panel once the radio has been on long enough,
+// or straight away if the radio never comes on (no network stored and no
+// portal: nothing will spike).
+static void matrixStartTick(uint32_t now) {
+  if (s_matrix_started) return;
+  if (WiFi.getMode() == WIFI_OFF) {
+    if (now > MATRIX_AFTER_RADIO_MS * 3) matrixStart();
+    return;
+  }
+  if (!s_radio_on_ms) s_radio_on_ms = now ? now : 1;
+  if (now - s_radio_on_ms >= MATRIX_AFTER_RADIO_MS) matrixStart();
+}
+
+static void projectSetup() {
   renderBegin();
   g_brightness_target = (uint8_t)g_boot_brightness;
   s_brightness = s_fade_for = g_brightness_target;
-  matrixSetBrightness(s_brightness);
   partyBegin();
   mqttBegin();
   matrixCanvas().fillScreen(0);
-  matrixShow();
 }
 
 static void projectLoop() {
   const uint32_t now = millis();
+  matrixStartTick(now);
   fadeTick(now);
   fetchTick();
   mqttTick();
@@ -162,7 +191,13 @@ static void projectLoop() {
   if (dirty && s_matrix_ok) matrixShow();
 }
 
-static void onPortal(bool open) { portalShow(open); if (s_matrix_ok) matrixShow(); }
+// The access point is up by now: its spike has passed, and the panel is the
+// only place the password is shown.
+static void onPortal(bool open) {
+  if (open) matrixStart();
+  portalShow(open);
+  if (s_matrix_ok) matrixShow();
+}
 
 // ---- web: the Status card and the live view -----------------------------------
 
@@ -257,7 +292,7 @@ static void statusJson(String &j) {
 
 static void statusLine(char *buf, size_t n) {
   snprintf(buf, n, "mode %s, matrix %s%s, mqtt %s", modeKey(g_mode), matrixDriverName(),
-           s_matrix_ok ? "" : " FAILED", g_mqtt_on ? "on" : "off");
+           !s_matrix_started ? " starting" : s_matrix_ok ? "" : " FAILED", g_mqtt_on ? "on" : "off");
 }
 
 // ---- web: routes ----------------------------------------------------------------

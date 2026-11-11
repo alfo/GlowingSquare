@@ -9,6 +9,7 @@
 #include "hardware/sd_logger.h"
 #include "services/app_settings.h"
 #include "services/breadcrumb.h"
+#include "services/brownout_guard.h"
 #include "services/device_name.h"
 #include "services/improv_serial.h"
 #include "services/mdns_service.h"
@@ -97,6 +98,9 @@ void appSetup() {
 #endif
 
   if (APP_HOOKS.setup) APP_HOOKS.setup();
+
+  // The radio starts next, by either route below.
+  brownoutGuardBegin();
 
 #ifdef APP_UI_LVGL
   // The screen decides: language, welcome, WiFi setup, or the main screen
