@@ -48,10 +48,27 @@ int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
     http.end();
     return code;
   }
-  DeserializationError e = filter
-      ? deserializeJson(out, http.getStream(), DeserializationOption::Filter(*filter))
-      : deserializeJson(out, http.getStream());
-  http.end();
+  DeserializationError e;
+  if (req.buffer_max) {
+    const int announced = http.getSize();   // -1 when the server sends none
+    if (announced > (int)req.buffer_max) {
+      snprintf(err, err_n, "answer too big (%d bytes)", announced);
+      http.end();
+      return -3;
+    }
+    const String body = http.getString();
+    http.end();
+    if (body.length() == 0) {
+      snprintf(err, err_n, "empty answer");
+      return -2;
+    }
+    e = filter ? deserializeJson(out, body, DeserializationOption::Filter(*filter))
+               : deserializeJson(out, body);
+  } else {
+    e = filter ? deserializeJson(out, http.getStream(), DeserializationOption::Filter(*filter))
+               : deserializeJson(out, http.getStream());
+    http.end();
+  }
   if (e) {
     snprintf(err, err_n, "JSON: %s", e.c_str());
     return -2;

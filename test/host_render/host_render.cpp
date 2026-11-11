@@ -32,6 +32,7 @@ static std::string g_last_url;
 int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter, char *err, size_t n) {
   g_last_url = req.url;
   static const struct { const char *part, *file; } MAP[] = {
+    { "api.tfl.gov.uk/StopPoint",    "tfl_nhg_stop.json" },
     { "api.tfl.gov.uk",              "tfl_victoria_oxc.json" },
     { "api.adsb.lol",                "adsb_london.json" },
     { "api.adsbdb.com",              "adsbdb_THA917.json" },
@@ -101,6 +102,20 @@ int main(int argc, char **argv) {
   g_tfl_direction = 1;
   fetchCommit(MODE_TUBE_OPS);
   assert(g_last_url.find("?direction=inbound") != std::string::npos);
+
+  // Every line at the stop, one platform only: Central (platform 3) and the
+  // other side (platform 2) drop out, whatever line TfL gives the rest.
+  g_tfl_line[0] = '\0';
+  g_tfl_direction = 0;
+  snprintf(g_tfl_plat_filter, sizeof g_tfl_plat_filter, "Platform 1");
+  matrixCanvas().fillScreen(0);
+  fetchCommit(MODE_TUBE_OPS);
+  runFor(MODE_TUBE_OPS, 20000);
+  dump("tube_platform_filter");
+  assert(g_last_url.find("/StopPoint/") != std::string::npos);
+  assert(rowHasColour(0, rgb565(255, 80, 0)) && rowHasColour(8, rgb565(255, 80, 0)));
+  assert(!rowHasColour(16, rgb565(255, 80, 0)));       // only two trains from platform 1
+  g_tfl_plat_filter[0] = '\0';
   snprintf(g_tfl_line, sizeof g_tfl_line, "victoria");
 
   // ---- Flights: central London ----

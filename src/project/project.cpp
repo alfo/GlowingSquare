@@ -11,6 +11,7 @@
 #include "project/modes/modes.h"
 #include "project/party.h"
 #include "project/render.h"
+#include "services/ota_ui.h"
 #include "services/setup_portal.h"
 #include "web/web_access.h"
 #include "web/web_jobs.h"
@@ -360,3 +361,22 @@ const AppHooks APP_HOOKS = {
 
 const WebPage* const PROJECT_WEB_PAGES[] = { nullptr };
 const size_t         PROJECT_WEB_PAGE_COUNT = 0;
+
+// ---- the panel during a firmware update -------------------------------------
+// Writing flash pauses code running from flash, the panel refresh included,
+// and a stalled refresh leaves one row lit: the panel strobes for the whole
+// transfer. Dark is calmer, and says that something is happening. These
+// replace the core's weak no-ops (services/ota_ui.h).
+
+void otaUiShow() {
+  matrixSetBrightness(0);
+}
+
+void otaUiHide() {
+  matrixSetBrightness(s_brightness);
+}
+
+void otaUiFailed() {
+  matrixSetBrightness(s_brightness);
+  logSD("Update failed: display back on");
+}

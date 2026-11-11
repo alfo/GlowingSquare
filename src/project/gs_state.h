@@ -21,6 +21,7 @@ extern char    g_tfl_line[24];     // line or bus route; empty = every line at t
 extern uint8_t g_tfl_direction;    // 0 both, 1 inbound, 2 outbound
 extern char    g_tfl_app_key[48];  // optional
 extern bool    g_tfl_platform;     // append the platform to the destination
+extern char    g_tfl_plat_filter[24]; // only platforms containing this; empty = all
 
 // ---- Flights ---------------------------------------------------------------
 extern char    g_fl_lat[16];

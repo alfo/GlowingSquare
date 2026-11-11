@@ -67,6 +67,7 @@ static bool tubeFetch(char *err, size_t err_n) {
   JsonDocument doc;
   GsHttp req;
   req.url = url;
+  req.buffer_max = GS_HTTP_BUFFER_MAX;
   if (gsHttpJson(req, doc, &filter, err, err_n) < 0 || !doc.is<JsonArray>()) {
     if (!err[0]) snprintf(err, err_n, "unexpected answer");
     return false;
@@ -76,6 +77,9 @@ static bool tubeFetch(char *err, size_t err_n) {
   int n = 0;
   for (JsonObjectConst v : doc.as<JsonArrayConst>()) {
     if (n >= TUBE_MAX_FETCHED) break;
+    // A platform filter picks one side of the station whatever line or
+    // direction TfL gives the train; some predictions carry neither.
+    if (g_tfl_plat_filter[0] && !strstr(v["platformName"] | "", g_tfl_plat_filter)) continue;
     Departure &d = all[n++];
     d.seconds = v["timeToStation"] | 0;
     // Buses often carry no "towards"; their destination says the same.

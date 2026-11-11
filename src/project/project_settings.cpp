@@ -76,6 +76,8 @@ const SettingDesc SETTINGS[] = {
   SETTING_TEXT("tfl_stop", SEC_TUBE, g_tfl_stop, STR_P_TFL_STOP, "940GZZLUOXC").info(STR_P_TFL_STOP_INFO).onChange(sourceChanged),
   SETTING_TEXT("tfl_line", SEC_TUBE, g_tfl_line, STR_P_TFL_LINE, "victoria").info(STR_P_TFL_LINE_INFO).onChange(sourceChanged),
   SETTING_ENUM("tfl_dir", SEC_TUBE, &g_tfl_direction, STR_P_TFL_DIR, 1, OPT_DIR).onChange(sourceChanged),
+  SETTING_TEXT("tfl_platf", SEC_TUBE, g_tfl_plat_filter, STR_P_TFL_PLAT_FILTER, "")
+      .info(STR_P_TFL_PLAT_FILTER_INFO).onChange(sourceChanged),
   settingBool("tfl_plat", SEC_TUBE, &g_tfl_platform, STR_P_TFL_PLATFORM, true),
   SETTING_SECRET("tfl_key", SEC_TUBE, g_tfl_app_key, STR_P_TFL_KEY).info(STR_P_TFL_KEY_INFO).onChange(sourceChanged),
 

@@ -40,6 +40,8 @@ S(STR_P_TFL_DIR_OUT,      "Outbound")
 S(STR_P_TFL_KEY,          "TfL app key")
 S(STR_P_TFL_KEY_INFO,     "Optional. Without one TfL limits requests heavily; a free key from api-portal.tfl.gov.uk allows 500 a minute.")
 S(STR_P_TFL_PLATFORM,     "Show the platform")
+S(STR_P_TFL_PLAT_FILTER,  "Platform")
+S(STR_P_TFL_PLAT_FILTER_INFO, "Only trains from platforms whose name contains this, e.g. \"Platform 1\" or \"Inner Rail\". Empty shows every platform. More reliable than the direction when TfL leaves it out.")
 
 // ---- Flights ----
 S(STR_P_FL_LAT,           "Latitude")

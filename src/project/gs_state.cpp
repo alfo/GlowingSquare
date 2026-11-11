@@ -13,6 +13,7 @@ char    g_tfl_line[24]     = "";
 uint8_t g_tfl_direction    = 1;
 char    g_tfl_app_key[48]  = "";
 bool    g_tfl_platform     = true;
+char    g_tfl_plat_filter[24] = "";
 
 char    g_fl_lat[16]       = "";
 char    g_fl_lon[16]       = "";

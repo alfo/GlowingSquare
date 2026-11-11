@@ -69,6 +69,7 @@ static const Route *routeFor(const char *callsign) {
   char err[48];
   GsHttp req;
   req.url = url;
+  req.buffer_max = GS_HTTP_BUFFER_MAX;
   if (gsHttpJson(req, doc, &filter, err, sizeof(err)) >= 200) {
     JsonObjectConst route = doc["response"]["flightroute"];
     if (!route.isNull()) {
@@ -112,6 +113,7 @@ static bool flightsFetch(char *err, size_t err_n) {
   JsonDocument doc;
   GsHttp req;
   req.url = url;
+  req.buffer_max = GS_HTTP_BUFFER_MAX;
   if (gsHttpJson(req, doc, &filter, err, err_n) < 0) return false;
 
   // The nearest one in the air, high enough, with a callsign to look up.
