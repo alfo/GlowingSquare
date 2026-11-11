@@ -91,19 +91,18 @@ volatile uint32_t s_found_size = 0;
 unsigned long s_due_ms = 0;
 bool s_scheduled = false;
 
-void updateCheckTask(void* arg) {
-  (void)arg;
-
+// The whole check, in a function of its own: the task deletes itself, and a
+// task that calls vTaskDelete(NULL) never returns, so the destructors of the
+// locals in that frame never run. With the TLS client among them that leaked
+// some 55 kB of internal heap per check, which on a board without PSRAM left
+// too little for any later HTTPS request. Here every local is gone before the
+// task ends.
+uint8_t runCheck() {
   WiFiClientSecure client;
   githubTrust(client);
   HTTPClient http;
 
-  if (!http.begin(client, VERSION_URL)) {
-    s_result = RES_FAIL_BEGIN;
-    s_task_running = false;
-    vTaskDelete(NULL);
-    return;
-  }
+  if (!http.begin(client, VERSION_URL)) return RES_FAIL_BEGIN;
 
   http.addHeader("User-Agent", APP_USER_AGENT);
   http.setConnectTimeout(HTTP_TIMEOUT_MS);
@@ -114,11 +113,8 @@ void updateCheckTask(void* arg) {
 
   if (code != 200) {
     Serial.printf("[upd] HTTP %d\n", code);
-    s_result = RES_FAIL_HTTP;
     http.end();
-    s_task_running = false;
-    vTaskDelete(NULL);
-    return;
+    return RES_FAIL_HTTP;
   }
 
   // Parsed straight off the stream. The old code pulled the whole body into a
@@ -130,11 +126,14 @@ void updateCheckTask(void* arg) {
 
   if (err) {
     Serial.printf("[upd] JSON error: %s\n", err.c_str());
-    s_result = RES_FAIL_JSON;
-    s_task_running = false;
-    vTaskDelete(NULL);
-    return;
+    return RES_FAIL_JSON;
   }
+
+  // The server answered, so the daily window starts now. Set before the
+  // result is published: the tick reads the result first and would otherwise
+  // take the no-clock branch and lose the timestamp until its next pass.
+  const time_t now = time(nullptr);
+  if ((uint32_t)now > TIME_IS_SYNCED) s_persist_epoch = (uint32_t)now;
 
   // With pre-releases on, fall back to the stable tag when the file carries no
   // separate pre-release, which is the case right after a public release.
@@ -159,12 +158,9 @@ void updateCheckTask(void* arg) {
   }
   s_found_size = size;
 
-  if (!tag || tag[0] == '\0') {
-    s_result = RES_FAIL_JSON;
-    s_task_running = false;
-    vTaskDelete(NULL);
-    return;
-  }
+  // Nothing published on this channel yet (a project with betas only, and
+  // pre-releases switched off): nothing to update to, not a bad answer.
+  if (!tag || tag[0] == '\0') return RES_UP_TO_DATE;
 
   strncpy(s_found_version, tag, sizeof(s_found_version) - 1);
   s_found_version[sizeof(s_found_version) - 1] = '\0';
@@ -183,15 +179,14 @@ void updateCheckTask(void* arg) {
   Serial.printf("[upd] task stack low water mark: %u bytes free\n",
                 (unsigned)uxTaskGetStackHighWaterMark(NULL));
 
-  // The server answered, so the daily window starts now. Set before s_result:
-  // the tick reads the result first and would otherwise take the no-clock
-  // branch and lose the timestamp until its next pass.
-  time_t now = time(nullptr);
-  if ((uint32_t)now > TIME_IS_SYNCED) s_persist_epoch = (uint32_t)now;
+  return (remote > installed) ? RES_AVAILABLE : RES_UP_TO_DATE;
+}
 
+void updateCheckTask(void* arg) {
+  (void)arg;
+  const uint8_t result = runCheck();
   // Published last. Everything the tick needs is in place by now.
-  s_result = (remote > installed) ? RES_AVAILABLE : RES_UP_TO_DATE;
-
+  s_result = result;
   s_task_running = false;
   vTaskDelete(NULL);
 }

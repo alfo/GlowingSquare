@@ -34,16 +34,21 @@ static TubeData s_next, s_cur;
 static void buildUrl(char *url, size_t n) {
   static const char *DIRS[] = { "", "inbound", "outbound" };
   const char *dir = g_tfl_direction < 3 ? DIRS[g_tfl_direction] : "";
+  // Several lines go comma separated ("circle,district"). Both directions
+  // means no direction at all: TfL answers an empty one with HTTP 400.
   if (g_tfl_line[0]) {
-    snprintf(url, n, "https://api.tfl.gov.uk/Line/%s/Arrivals/%s?direction=%s",
-             g_tfl_line, g_tfl_stop, dir);
+    snprintf(url, n, "https://api.tfl.gov.uk/Line/%s/Arrivals/%s", g_tfl_line, g_tfl_stop);
   } else {
     snprintf(url, n, "https://api.tfl.gov.uk/StopPoint/%s/Arrivals", g_tfl_stop);
   }
-  if (g_tfl_app_key[0]) {
-    const size_t len = strlen(url);
-    snprintf(url + len, n - len, "%capp_key=%s", g_tfl_line[0] ? '&' : '?', g_tfl_app_key);
+  char sep = '?';
+  size_t len = strlen(url);
+  if (g_tfl_line[0] && dir[0]) {
+    snprintf(url + len, n - len, "%cdirection=%s", sep, dir);
+    sep = '&';
+    len = strlen(url);
   }
+  if (g_tfl_app_key[0]) snprintf(url + len, n - len, "%capp_key=%s", sep, g_tfl_app_key);
 }
 
 static bool tubeFetch(char *err, size_t err_n) {

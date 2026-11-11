@@ -42,6 +42,10 @@ add a hook or a registry entry instead.
   does not answer and a WiFi that does not come back.
 - LVGL, NVS and the log belong to the loop task. A worker task touches none of
   them; it sets state the loop reads.
+- A task that ends with `vTaskDelete(NULL)` never returns, so destructors of
+  locals in that frame never run. Do the work in a function the task calls
+  (HTTP clients, JSON documents, Strings live there), then delete the task.
+  A TLS client leaked this way costs ~55 kB of internal heap per run.
 - Workers check `workerHeapReady()` before they start. Without PSRAM (classic
   ESP32) a TLS handshake costs some 40 kB of internal heap: one at a time.
 

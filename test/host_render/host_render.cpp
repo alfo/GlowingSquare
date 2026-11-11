@@ -27,7 +27,10 @@ static std::string slurp(const std::string &path) {
 
 // Every request answered from a file, picked by a piece of its URL. The
 // filter is applied exactly as on the device.
+static std::string g_last_url;
+
 int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter, char *err, size_t n) {
+  g_last_url = req.url;
   static const struct { const char *part, *file; } MAP[] = {
     { "api.tfl.gov.uk",              "tfl_victoria_oxc.json" },
     { "api.adsb.lol",                "adsb_london.json" },
@@ -88,6 +91,17 @@ int main(int argc, char **argv) {
   runFor(MODE_TUBE_OPS, 60000);                        // every row has had its turn
   dump("tube_settled");
   for (int r = 0; r < 4; r++) assert(rowHasColour(r * 8, rgb565(255, 80, 0)));
+
+  // Both directions and several lines: no empty "direction=" (TfL says 400).
+  snprintf(g_tfl_line, sizeof g_tfl_line, "circle,district");
+  g_tfl_direction = 0;
+  fetchCommit(MODE_TUBE_OPS);
+  assert(g_last_url.find("direction") == std::string::npos);
+  assert(g_last_url.find("/Line/circle,district/Arrivals/") != std::string::npos);
+  g_tfl_direction = 1;
+  fetchCommit(MODE_TUBE_OPS);
+  assert(g_last_url.find("?direction=inbound") != std::string::npos);
+  snprintf(g_tfl_line, sizeof g_tfl_line, "victoria");
 
   // ---- Flights: central London ----
   snprintf(g_fl_lat, sizeof g_fl_lat, "51.5074");

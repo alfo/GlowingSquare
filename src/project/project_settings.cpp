@@ -6,6 +6,7 @@
 #include "project/gs_state.h"
 #include "project/gs_web_extra.h"
 #include "project/matrix/matrix.h"
+#include "project/modes/modes.h"
 #include "lang.h"
 
 enum Section : uint8_t { SEC_DISPLAY = 0, SEC_TUBE, SEC_FLIGHTS, SEC_UNIFI, SEC_MQTT, SEC_PINS };
@@ -24,6 +25,8 @@ static bool always()      { return true; }
 #endif
 
 static void modeChanged() { g_mode_changed = true; }
+// A changed stop, line or address shows on the next pass, not a minute later.
+static void sourceChanged() { fetchNow(); }
 #ifdef MATRIX_PXMATRIX
 static void timingChanged() { matrixApplyTiming(); }
 #endif
@@ -70,26 +73,26 @@ const SettingDesc SETTINGS[] = {
       .unitLabel("ms").info(STR_P_SCROLL_INFO),
 
   // ---- Tube ----
-  SETTING_TEXT("tfl_stop", SEC_TUBE, g_tfl_stop, STR_P_TFL_STOP, "940GZZLUOXC").info(STR_P_TFL_STOP_INFO),
-  SETTING_TEXT("tfl_line", SEC_TUBE, g_tfl_line, STR_P_TFL_LINE, "victoria").info(STR_P_TFL_LINE_INFO),
-  SETTING_ENUM("tfl_dir", SEC_TUBE, &g_tfl_direction, STR_P_TFL_DIR, 1, OPT_DIR),
+  SETTING_TEXT("tfl_stop", SEC_TUBE, g_tfl_stop, STR_P_TFL_STOP, "940GZZLUOXC").info(STR_P_TFL_STOP_INFO).onChange(sourceChanged),
+  SETTING_TEXT("tfl_line", SEC_TUBE, g_tfl_line, STR_P_TFL_LINE, "victoria").info(STR_P_TFL_LINE_INFO).onChange(sourceChanged),
+  SETTING_ENUM("tfl_dir", SEC_TUBE, &g_tfl_direction, STR_P_TFL_DIR, 1, OPT_DIR).onChange(sourceChanged),
   settingBool("tfl_plat", SEC_TUBE, &g_tfl_platform, STR_P_TFL_PLATFORM, true),
-  SETTING_SECRET("tfl_key", SEC_TUBE, g_tfl_app_key, STR_P_TFL_KEY).info(STR_P_TFL_KEY_INFO),
+  SETTING_SECRET("tfl_key", SEC_TUBE, g_tfl_app_key, STR_P_TFL_KEY).info(STR_P_TFL_KEY_INFO).onChange(sourceChanged),
 
   // ---- Flights ----
-  SETTING_TEXT("fl_lat", SEC_FLIGHTS, g_fl_lat, STR_P_FL_LAT, "51.5074").info(STR_P_FL_LATLON_INFO),
-  SETTING_TEXT("fl_lon", SEC_FLIGHTS, g_fl_lon, STR_P_FL_LON, "-0.1278"),
-  settingInt("fl_radius", SEC_FLIGHTS, &g_fl_radius_nm, STR_P_FL_RADIUS, 10, 1, 100).unitLabel("nm"),
+  SETTING_TEXT("fl_lat", SEC_FLIGHTS, g_fl_lat, STR_P_FL_LAT, "51.5074").info(STR_P_FL_LATLON_INFO).onChange(sourceChanged),
+  SETTING_TEXT("fl_lon", SEC_FLIGHTS, g_fl_lon, STR_P_FL_LON, "-0.1278").onChange(sourceChanged),
+  settingInt("fl_radius", SEC_FLIGHTS, &g_fl_radius_nm, STR_P_FL_RADIUS, 10, 1, 100).unitLabel("nm").onChange(sourceChanged),
   settingInt("fl_min_alt", SEC_FLIGHTS, &g_fl_min_alt_ft, STR_P_FL_MIN_ALT, 500, 0, 40000)
-      .unitLabel("ft").info(STR_P_FL_MIN_ALT_INFO),
+      .unitLabel("ft").info(STR_P_FL_MIN_ALT_INFO).onChange(sourceChanged),
 
   // ---- Unifi ----
-  SETTING_TEXT("unifi_url", SEC_UNIFI, g_unifi_url, STR_P_UNIFI_URL, "https://192.168.1.1").info(STR_P_UNIFI_URL_INFO),
-  SETTING_TEXT("unifi_site", SEC_UNIFI, g_unifi_site, STR_P_UNIFI_SITE, "default"),
-  SETTING_ENUM("unifi_auth", SEC_UNIFI, &g_unifi_auth, STR_P_UNIFI_AUTH, UNIFI_AUTH_KEY, OPT_UAUTH),
-  SETTING_SECRET("unifi_key", SEC_UNIFI, g_unifi_key, STR_P_UNIFI_KEY).info(STR_P_UNIFI_KEY_INFO).when(unifiKey),
-  SETTING_TEXT("unifi_user", SEC_UNIFI, g_unifi_user, STR_P_UNIFI_USER, "").info(STR_P_UNIFI_USER_INFO).when(unifiLogin),
-  SETTING_SECRET("unifi_pass", SEC_UNIFI, g_unifi_pass, STR_P_UNIFI_PASS).when(unifiLogin),
+  SETTING_TEXT("unifi_url", SEC_UNIFI, g_unifi_url, STR_P_UNIFI_URL, "https://192.168.1.1").info(STR_P_UNIFI_URL_INFO).onChange(sourceChanged),
+  SETTING_TEXT("unifi_site", SEC_UNIFI, g_unifi_site, STR_P_UNIFI_SITE, "default").onChange(sourceChanged),
+  SETTING_ENUM("unifi_auth", SEC_UNIFI, &g_unifi_auth, STR_P_UNIFI_AUTH, UNIFI_AUTH_KEY, OPT_UAUTH).onChange(sourceChanged),
+  SETTING_SECRET("unifi_key", SEC_UNIFI, g_unifi_key, STR_P_UNIFI_KEY).info(STR_P_UNIFI_KEY_INFO).when(unifiKey).onChange(sourceChanged),
+  SETTING_TEXT("unifi_user", SEC_UNIFI, g_unifi_user, STR_P_UNIFI_USER, "").info(STR_P_UNIFI_USER_INFO).when(unifiLogin).onChange(sourceChanged),
+  SETTING_SECRET("unifi_pass", SEC_UNIFI, g_unifi_pass, STR_P_UNIFI_PASS).when(unifiLogin).onChange(sourceChanged),
   settingBool("unifi_tls", SEC_UNIFI, &g_unifi_verify_tls, STR_P_UNIFI_TLS, false).info(STR_P_UNIFI_TLS_INFO),
 
   // ---- MQTT ----
