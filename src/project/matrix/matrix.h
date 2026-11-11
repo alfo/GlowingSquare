@@ -56,6 +56,12 @@ void matrixApplyTiming();
 // False when the panel could not be held: it is then best left dark.
 bool matrixHold(int16_t y);
 
+// Starts the refresh again when it has stopped (the refresh watch in
+// project.cpp asks). On 11.11.2026 a running PxMatrix refresh stopped for
+// good, panel black; releasing the update hold, which restarts its timer,
+// brought it back. The DMA build refreshes by itself: nothing to do.
+void matrixRestartRefresh();
+
 // Which driver this build has, for the Status page and the log.
 const char *matrixDriverName();
 

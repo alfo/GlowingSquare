@@ -107,6 +107,7 @@ static uint8_t s_shown_mode = 255;
 static uint8_t s_shown_party = PARTY_OFF;
 static bool s_shown_offline = false;
 static bool s_redraw = false;   // the mode draws again: an update bar covered it
+static void refreshWatch(uint32_t now);
 
 // The panel starts after the WiFi radio, as in v1. The radio's start-up
 // calibration draws a spike that, on top of a refreshing panel, browned these
@@ -198,6 +199,7 @@ static void projectLoop() {
     if (!s_shown_offline) dirty |= modeOps(g_mode).frame(now);
   }
   if (dirty && s_matrix_ok) matrixShow();
+  refreshWatch(now);
 }
 
 // The access point is up by now: its spike has passed, and the panel is the
@@ -296,7 +298,8 @@ static void statusJson(String &j) {
   j += jsonEsc(lastUpdate().c_str());
   j += F("\",\"mqtt\":\"");
   j += jsonEsc(mqttText().c_str());
-  j += '"';
+  j += F("\",\"refresh\":");
+  j += String(matrixRefreshCount());
 }
 
 static void statusLine(char *buf, size_t n) {
@@ -456,4 +459,38 @@ void otaUiHide() {
 void otaUiFailed() {
   otaUiHide();
   logSD("Update failed: display back on");
+}
+
+// ---- the refresh, watched ----------------------------------------------------
+// On 11.11.2026 the Flight display's panel went black for good with a whole
+// frame behind it: the refresh had stopped, and nothing noticed. The PxMatrix
+// refresh counts every pass (matrixRefreshCount()); when the count stands
+// still outside an update, the refresh is started again, as releasing the
+// update hold did that evening, and logged. If even that does not move it,
+// the display restarts. A black panel whose count still moves is the panel
+// or its wiring, not this. The DMA driver counts nothing and is not watched.
+#define REFRESH_STALL_LOG_MS      2000
+#define REFRESH_STALL_RESTART_MS  10000
+
+static void refreshWatch(uint32_t now) {
+  static uint32_t last_count = 0, since_ms = 0;
+  static bool logged = false;
+  const uint32_t count = matrixRefreshCount();
+  if (!s_matrix_ok || s_ota_shown || count == 0 || count != last_count) {
+    last_count = count;
+    since_ms = now;
+    logged = false;
+    return;
+  }
+  const uint32_t still = now - since_ms;
+  if (!logged && still >= REFRESH_STALL_LOG_MS) {
+    logged = true;
+    logSDf("Matrix: refresh stopped at %lu passes, starting it again", (unsigned long)count);
+    matrixRestartRefresh();
+  }
+  if (still >= REFRESH_STALL_RESTART_MS) {
+    logSD("Reboot: the panel refresh stopped");
+    delay(100);
+    ESP.restart();
+  }
 }

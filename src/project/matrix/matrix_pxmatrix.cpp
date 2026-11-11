@@ -162,6 +162,13 @@ bool matrixHold(int16_t y) {
   return true;
 }
 
+void matrixRestartRefresh() {
+  if (!s_timer || s_hold_row >= 0) return;
+  timerAlarm(s_timer, (uint64_t)g_px_period_us, true, 0);
+  timerRestart(s_timer);
+  timerStart(s_timer);
+}
+
 void matrixShow() {
   const uint16_t *px = matrixCanvas().getBuffer();
   for (int16_t y = 0; y < MATRIX_H; y++)
