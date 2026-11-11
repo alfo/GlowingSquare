@@ -78,6 +78,8 @@ const SettingDesc SETTINGS[] = {
   SETTING_ENUM("tfl_dir", SEC_TUBE, &g_tfl_direction, STR_P_TFL_DIR, 1, OPT_DIR).onChange(sourceChanged),
   SETTING_TEXT("tfl_platf", SEC_TUBE, g_tfl_plat_filter, STR_P_TFL_PLAT_FILTER, "")
       .info(STR_P_TFL_PLAT_FILTER_INFO).onChange(sourceChanged),
+  SETTING_TEXT("tfl_ren", SEC_TUBE, g_tfl_rename, STR_P_TFL_RENAME, "")
+      .info(STR_P_TFL_RENAME_INFO).onChange(sourceChanged),
   settingBool("tfl_plat", SEC_TUBE, &g_tfl_platform, STR_P_TFL_PLATFORM, true),
   SETTING_SECRET("tfl_key", SEC_TUBE, g_tfl_app_key, STR_P_TFL_KEY).info(STR_P_TFL_KEY_INFO).onChange(sourceChanged),
 

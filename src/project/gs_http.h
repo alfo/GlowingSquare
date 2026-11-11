@@ -33,8 +33,8 @@ struct GsHttp {
 int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
                char *err, size_t err_n);
 
-// The same request, for an answer whose bulk is one array under `list`
-// (project/json_walk.h): each element is parsed through `filter` on its own
+// The same request, for an answer whose bulk is one array under `list`, or
+// is that array with list nullptr (project/json_walk.h): each element is parsed through `filter` on its own
 // and handed to `each(el, ctx)`, so the array never has to fit in RAM. Read
 // to the last byte even when the server ends the body by closing.
 // buffer_max is ignored.

@@ -33,6 +33,10 @@ static bool          s_now = false;
 static uint8_t       s_fails = 0;
 static uint32_t      s_last_ok_ms = 0;
 static LogGate       s_heap_gate{};
+// The least stack a fetch has left, in bytes, and the least logged so far.
+// A TLS handshake is the deepest it goes; this says how close that came.
+static volatile uint32_t s_stack_left = 0;
+static uint32_t      s_stack_logged = UINT32_MAX;
 
 void fetchNow() { s_now = true; }
 bool fetchBusy() { return s_state != FS_IDLE; }
@@ -43,6 +47,7 @@ const char *fetchLastError() { return s_last_err; }
 static void fetchTask(void *) {
   s_err[0] = '\0';
   s_ok = s_running_mode->fetch(s_err, sizeof(s_err));
+  s_stack_left = uxTaskGetStackHighWaterMark(NULL);
   __sync_synchronize();
   s_state = FS_DONE;
   vTaskDelete(NULL);
@@ -57,6 +62,11 @@ static bool networkBusy() {
 static void collect() {
   const DisplayMode *m = s_running_mode;
   s_state = FS_IDLE;
+  if (s_stack_left < s_stack_logged) {
+    s_stack_logged = s_stack_left;
+    logSDf("[fetch] stack: %lu of %u bytes left at the deepest", (unsigned long)s_stack_left,
+           (unsigned)FETCH_STACK_BYTES);
+  }
   // The mode was switched while this ran: its answer is for nobody.
   if (m != &modeOps(g_mode)) return;
   if (s_ok) {

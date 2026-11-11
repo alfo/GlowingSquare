@@ -10,7 +10,9 @@
 #include <vector>
 
 #include "project/gs_http.h"
+#include "project/body_blocks.h"
 #include "project/json_walk.h"
+#include "project/tfl_rename.h"
 #include "project/gs_state.h"
 #include "project/matrix/matrix.h"
 #include "project/modes/modes.h"
@@ -43,6 +45,7 @@ static std::string answerFor(const char *url, int &code, char *err, size_t n) {
     return "";
   }
   static const struct { const char *part, *file; } MAP[] = {
+    { "940GZZLUNHG?11nov",           "tfl_nhg_mislabelled.json" },
     { "api.tfl.gov.uk/StopPoint",    "tfl_nhg_stop.json" },
     { "api.tfl.gov.uk",              "tfl_victoria_oxc.json" },
     { "api.adsb.lol",                "adsb_london.json" },
@@ -109,8 +112,44 @@ static void testJsonWalk() {
   assert(walkCount("{\"msg\":\"ac\",\"ac\" : [ ]}", "ac", &e) == 0 && !e);       // "ac" as a value first
   assert(walkCount("{\"aircraft\":[{\"k\":1},{\"k\":2}", "aircraft", &e) == 3);  // cut off
   assert(e == DeserializationError::IncompleteInput);
+  assert(walkCount(" [{\"k\":2},{\"k\":3}]", nullptr, &e) == 5 && !e);       // the answer is the array
+  assert(walkCount("[]", nullptr, &e) == 0 && !e);
   walkCount("{\"now\":1}", "ac", &e);
   assert(e == DeserializationError::IncompleteInput);                            // never found
+}
+
+static void testBodyBlocks() {
+  // Across several blocks, and walked from them as on the device.
+  std::string json = "[";
+  for (int i = 1; i <= 400; i++) json += std::string(i > 1 ? "," : "") + "{\"k\":1,\"pad\":\"................\"}";
+  json += "]";
+  assert(json.size() > 3 * BodyBlocks::BLOCK);
+  BodyBlocks blocks(64 * 1024);
+  for (size_t i = 0; i < json.size(); i += 333)
+    assert(blocks.append((const uint8_t *)json.data() + i, std::min<size_t>(333, json.size() - i)));
+  assert(blocks.size() == json.size());
+  JsonDocument filter;
+  filter["k"] = true;
+  int sum = 0;
+  assert(!jsonWalkArray(blocks, nullptr, filter, [&](JsonObjectConst el) { sum += el["k"] | 0; }));
+  assert(sum == 400);
+  assert(blocks.read() < 0);                               // and stays ended
+  BodyBlocks small(10);                                    // over the cap: refused, nothing kept
+  assert(small.append((const uint8_t *)"0123456789", 10));
+  assert(!small.append((const uint8_t *)"x", 1));
+  BodyBlocks none(10);
+  assert(none.read() < 0);
+}
+
+static void testRename() {
+  char out[40];
+  const char *rules = "Hammersmith=Circle via Victoria; check front of train = Wimbledon";
+  assert(tflRename("Hammersmith", rules, out, sizeof out) && !strcmp(out, "Circle via Victoria"));
+  assert(tflRename("Check Front of Train", rules, out, sizeof out) && !strcmp(out, "Wimbledon"));
+  assert(!tflRename("Edgware Road (Circle)", rules, out, sizeof out) && !strcmp(out, "Edgware Road (Circle)"));
+  assert(!tflRename("Epping", "", out, sizeof out) && !strcmp(out, "Epping"));
+  assert(!tflRename("Epping", "nonsense;=x; ;", out, sizeof out) && !strcmp(out, "Epping"));
+  assert(tflRename("Tower Hill via Victoria", "x=y;tower hill=Circle", out, sizeof out) && !strcmp(out, "Circle"));
 }
 
 static void dump(const char *name) {
@@ -176,10 +215,24 @@ int main(int argc, char **argv) {
   assert(g_last_url.find("/StopPoint/") != std::string::npos);
   assert(rowHasColour(0, rgb565(255, 80, 0)) && rowHasColour(8, rgb565(255, 80, 0)));
   assert(!rowHasColour(16, rgb565(255, 80, 0)));       // only two trains from platform 1
+  // TfL on 11.11.2026: every train on platform 1 as the Hammersmith & City,
+  // the Circle to "Hammersmith" and the District as "Check Front of Train".
+  // The Rename setting says what the platform's own sign says.
+  snprintf(g_tfl_stop, sizeof g_tfl_stop, "940GZZLUNHG?11nov");   // the recorded answer
+  snprintf(g_tfl_rename, sizeof g_tfl_rename, "Hammersmith=Circle via Victoria; Check Front of Train=Wimbledon");
+  matrixCanvas().fillScreen(0);
+  fetchCommit(MODE_TUBE_OPS);
+  runFor(MODE_TUBE_OPS, 60000);
+  dump("tube_renamed");
+  for (int r = 0; r < 4; r++) assert(rowHasColour(r * 8, rgb565(255, 80, 0)));
+  g_tfl_rename[0] = '\0';
+  snprintf(g_tfl_stop, sizeof g_tfl_stop, "940GZZLUOXC");
   g_tfl_plat_filter[0] = '\0';
   snprintf(g_tfl_line, sizeof g_tfl_line, "victoria");
 
   testJsonWalk();
+  testRename();
+  testBodyBlocks();
 
   // ---- Flights: central London ----
   snprintf(g_fl_lat, sizeof g_fl_lat, "51.5074");

@@ -7,7 +7,8 @@
 // ============================================================
 //  One array in a JSON answer, an element at a time
 //
-//  jsonWalkArray() finds "key": [ in whatever `src` reads and parses the
+//  jsonWalkArray() finds "key": [ in whatever `src` reads (or, with key
+//  nullptr, takes the answer as the array itself) and parses the
 //  array's elements one by one, each through `filter` into one small
 //  document, handing each to `each`. Memory stays one element however long
 //  the array is: the adsb feeds answer 55 kB for 50 nm around London, more
@@ -56,6 +57,12 @@ class JsonPeekReader {
 // is passed over.
 template <typename Src>
 static DeserializationError jsonSeekArray(JsonPeekReader<Src> &r, const char *key) {
+  if (!key) {   // the answer is the array itself (TfL)
+    if (r.skipSpace() != '[') return r.peek() < 0 ? DeserializationError::IncompleteInput
+                                                  : DeserializationError::InvalidInput;
+    r.read();
+    return DeserializationError::Ok;
+  }
   const size_t n = strlen(key);
   for (;;) {
     size_t matched = 0;   // bytes of "key" seen so far, the quotes included

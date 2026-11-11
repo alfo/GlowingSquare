@@ -8,47 +8,63 @@
 #include "services/github_release.h"   // githubTrust(): the IDF certificate bundle
 #include "services/worker_heap.h"      // TlsSlot
 
+#include "project/body_blocks.h"
 #include "project/json_walk.h"
 
 // How the body is read once the server has said 2xx; http is open.
 struct GsBody {
   JsonDocument       *out = nullptr;      // gsHttpJson
   const JsonDocument *filter = nullptr;
-  const char         *list = nullptr;     // gsHttpJsonEach
+  bool                walk = false;       // gsHttpJsonEach: the array a piece at a time
+  const char         *list = nullptr;     // its key; nullptr: the answer is the array
   GsJsonEach          each = nullptr;
   void               *ctx = nullptr;
 };
 
-// The body byte by byte. Waits while the connection is open and nothing has
-// come yet, so a body that ends by closing (adsb.fi) is read to its end.
-class SocketSource {
- public:
-  SocketSource(WiFiClient *c, uint32_t timeout_ms) : c_(c), timeout_ms_(timeout_ms) {}
-  int read() {
-    if (pos_ < len_) return buf_[pos_++];
-    const uint32_t start = millis();
-    while (millis() - start < timeout_ms_) {
-      const int avail = c_ ? c_->available() : 0;
-      if (avail > 0) {
-        len_ = c_->read(buf_, (size_t)avail < sizeof(buf_) ? (size_t)avail : sizeof(buf_));
-        pos_ = 0;
-        if (len_ > 0) return buf_[pos_++];
-      } else if (!c_ || !c_->connected()) {
-        return -1;
+// What an answer read into blocks may weigh: 50 nm of busy sky over London
+// is 55 kB. And the heap left beside them, for the parse and the TLS
+// connection still open.
+#define GS_HTTP_WALK_MAX      (64u * 1024u)
+#define GS_HTTP_HEAP_RESERVE  (16u * 1024u)
+
+// Everything the server sends, as fast as it comes, until the Content-Length
+// or, without one, until it closes (HTTP/1.0). See body_blocks.h for why
+// the answer is read whole before it is parsed.
+static bool readAll(HTTPClient &http, const GsHttp &req, BodyBlocks &blocks,
+                    char *err, size_t err_n) {
+  WiFiClient *c = http.getStreamPtr();
+  const int length = http.getSize();   // -1 when the server sends none
+  uint8_t buf[512];
+  uint32_t last = millis();
+  while (c && (length < 0 || blocks.size() < (size_t)length)) {
+    const int avail = c->available();
+    if (avail <= 0) {
+      if (!c->connected()) break;
+      if (millis() - last >= req.timeout_ms) {
+        snprintf(err, err_n, "read timeout after %u bytes", (unsigned)blocks.size());
+        return false;
       }
       delay(1);
+      continue;
     }
-    return -1;
+    const int n = c->read(buf, (size_t)avail < sizeof(buf) ? (size_t)avail : sizeof(buf));
+    if (n <= 0) continue;
+    if (ESP.getFreeHeap() < GS_HTTP_HEAP_RESERVE || !blocks.append(buf, (size_t)n)) {
+      snprintf(err, err_n, "answer too big (%u bytes so far)", (unsigned)blocks.size());
+      return false;
+    }
+    last = millis();
   }
+  if (length >= 0 && blocks.size() < (size_t)length) {
+    snprintf(err, err_n, "answer cut off at %u of %d bytes", (unsigned)blocks.size(), length);
+    return false;
+  }
+  return true;
+}
 
- private:
-  WiFiClient *c_;
-  uint32_t    timeout_ms_;
-  uint8_t     buf_[256];
-  int         len_ = 0, pos_ = 0;
-};
-
-static DeserializationError readWhole(HTTPClient &http, const GsHttp &req, const GsBody &b,
+// Out of line, both readers: their buffers and documents are on the stack
+// only once the handshake is over, the deepest point of a fetch.
+__attribute__((noinline)) static DeserializationError readWhole(HTTPClient &http, const GsHttp &req, const GsBody &b,
                                       char *err, size_t err_n) {
   if (req.buffer_max) {
     const int announced = http.getSize();   // -1 when the server sends none
@@ -65,11 +81,14 @@ static DeserializationError readWhole(HTTPClient &http, const GsHttp &req, const
                   : deserializeJson(*b.out, http.getStream());
 }
 
-static DeserializationError readEach(HTTPClient &http, const GsHttp &req, const GsBody &b) {
-  SocketSource src(http.getStreamPtr(), req.timeout_ms);
+__attribute__((noinline)) static DeserializationError readEach(HTTPClient &http, const GsHttp &req,
+                                                              const GsBody &b, char *err, size_t err_n) {
+  BodyBlocks blocks(GS_HTTP_WALK_MAX);
+  if (!readAll(http, req, blocks, err, err_n)) return DeserializationError::IncompleteInput;
+  http.end();   // all of it is here: the connection can go before the parse
   GsJsonEach each = b.each;
   void *ctx = b.ctx;
-  return jsonWalkArray(src, b.list, *b.filter,
+  return jsonWalkArray(blocks, b.list, *b.filter,
                        [each, ctx](JsonObjectConst el) { each(el, ctx); });
 }
 
@@ -99,7 +118,7 @@ static int request(const GsHttp &req, const GsBody &b, char *err, size_t err_n, 
     else secure.setInsecure();
   }
   HTTPClient http;
-  // HTTP/1.0: no chunked transfer, so the body can be parsed off the stream.
+  // HTTP/1.0: no chunked transfer, so the body can be read straight off.
   http.useHTTP10(true);
   http.setConnectTimeout(req.timeout_ms);
   http.setTimeout(req.timeout_ms);
@@ -114,10 +133,10 @@ static int request(const GsHttp &req, const GsBody &b, char *err, size_t err_n, 
     http.end();
     return code;
   }
-  const DeserializationError e = b.list ? readEach(http, req, b) : readWhole(http, req, b, err, err_n);
+  const DeserializationError e = b.walk ? readEach(http, req, b, err, err_n) : readWhole(http, req, b, err, err_n);
   http.end();
   if (!e) return code;
-  if (err[0]) return -3;   // refused before reading: readWhole() said why
+  if (err[0]) return -3;   // too big, cut off or too slow: the reader said why
   snprintf(err, err_n, "JSON: %s", e.c_str());
   return -2;
 }
@@ -150,6 +169,7 @@ int gsHttpJsonEach(const GsHttp &req, const char *list, const JsonDocument &filt
                    GsJsonEach each, void *ctx, char *err, size_t err_n) {
   GsBody b;
   b.filter = &filter;
+  b.walk = true;
   b.list = list;
   b.each = each;
   b.ctx = ctx;

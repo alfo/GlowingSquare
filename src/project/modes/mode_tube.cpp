@@ -11,10 +11,10 @@
 #include "project/gs_state.h"
 #include "project/modes/modes.h"
 #include "project/render.h"
+#include "project/tfl_rename.h"
 
 #define TUBE_ROWS        4
 #define TUBE_ROW_GAP_MS  1000   // v1: delay(1000) between the rows
-#define TUBE_MAX_FETCHED 24
 
 struct Departure {
   int  seconds;
@@ -51,47 +51,49 @@ static void buildUrl(char *url, size_t n) {
   if (g_tfl_app_key[0]) snprintf(url + len, n - len, "%capp_key=%s", sep, g_tfl_app_key);
 }
 
+// One prediction from the walk: kept if it is on the platform asked for and
+// among the four soonest so far. TfL does not sort them; v1 did, and so does
+// this, as they come.
+static void consider(JsonObjectConst v, void *ctx) {
+  TubeData &t = *(TubeData *)ctx;
+  // A platform filter picks one side of the station whatever line or
+  // direction TfL gives the train; some predictions carry neither.
+  if (g_tfl_plat_filter[0] && !strstr(v["platformName"] | "", g_tfl_plat_filter)) return;
+  const int seconds = v["timeToStation"] | 0;
+  int at = t.count;
+  while (at > 0 && t.dep[at - 1].seconds > seconds) at--;
+  if (at >= TUBE_ROWS) return;
+  for (int i = std::min<int>(t.count, TUBE_ROWS - 1); i > at; i--) t.dep[i] = t.dep[i - 1];
+  if (t.count < TUBE_ROWS) t.count++;
+  Departure &d = t.dep[at];
+  d.seconds = seconds;
+  // Buses often carry no "towards"; their destination says the same.
+  const char *to = v["towards"] | "";
+  if (!to[0]) to = v["destinationName"] | "";
+  tflRename(to, g_tfl_rename, d.towards, sizeof(d.towards));
+  snprintf(d.platform, sizeof(d.platform), "%s", v["platformName"] | "");
+}
+
 static bool tubeFetch(char *err, size_t err_n) {
   if (!g_tfl_stop[0]) { snprintf(err, err_n, "no stop set"); return false; }
   char url[200];
   buildUrl(url, sizeof(url));
 
-  // TfL's answer can be an absolute chonker with both directions: only the
-  // four fields drawn are kept.
+  // TfL's answer can be an absolute chonker with both directions: it is read
+  // a prediction at a time, and only the four fields drawn are kept.
   JsonDocument filter;
-  filter[0]["timeToStation"] = true;
-  filter[0]["towards"] = true;
-  filter[0]["destinationName"] = true;
-  filter[0]["platformName"] = true;
+  filter["timeToStation"] = true;
+  filter["towards"] = true;
+  filter["destinationName"] = true;
+  filter["platformName"] = true;
 
-  JsonDocument doc;
   GsHttp req;
   req.url = url;
-  req.buffer_max = GS_HTTP_BUFFER_MAX;
-  if (gsHttpJson(req, doc, &filter, err, err_n) < 0 || !doc.is<JsonArray>()) {
+  s_next = TubeData();
+  if (gsHttpJsonEach(req, nullptr, filter, consider, &s_next, err, err_n) < 0) {
     if (!err[0]) snprintf(err, err_n, "unexpected answer");
     return false;
   }
-
-  Departure all[TUBE_MAX_FETCHED];
-  int n = 0;
-  for (JsonObjectConst v : doc.as<JsonArrayConst>()) {
-    if (n >= TUBE_MAX_FETCHED) break;
-    // A platform filter picks one side of the station whatever line or
-    // direction TfL gives the train; some predictions carry neither.
-    if (g_tfl_plat_filter[0] && !strstr(v["platformName"] | "", g_tfl_plat_filter)) continue;
-    Departure &d = all[n++];
-    d.seconds = v["timeToStation"] | 0;
-    // Buses often carry no "towards"; their destination says the same.
-    const char *to = v["towards"] | "";
-    if (!to[0]) to = v["destinationName"] | "";
-    snprintf(d.towards, sizeof(d.towards), "%s", to);
-    snprintf(d.platform, sizeof(d.platform), "%s", v["platformName"] | "");
-  }
-  // TfL does not sort them; v1 did, and so does this.
-  std::sort(all, all + n, [](const Departure &a, const Departure &b) { return a.seconds < b.seconds; });
-  s_next.count = (uint8_t)std::min(n, TUBE_ROWS);
-  for (int i = 0; i < s_next.count; i++) s_next.dep[i] = all[i];
   return true;
 }
 
