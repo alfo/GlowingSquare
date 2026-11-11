@@ -1,10 +1,16 @@
-// PxMatrix, as v1 drove it: double-buffered, refreshed from a hardware timer
-// interrupt every 4 ms, 1/16 scan, with the mux delay the SRYLED P4 panels
-// need. Pins are Brian Lough's ESP32 Matrix Shield (Mini 32): R1 on GPIO13
+// PxMatrix, as v1 drove it: double-buffered, refreshed every 4 ms, 1/16 scan,
+// with the mux delay the SRYLED P4 panels need.
+//
+// v1 refreshed from a hardware timer interrupt inside a critical section.
+// On Arduino core 3 every SPI call takes a mutex, which may not be taken
+// there: FreeRTOS asserts on the first refresh and the device boot-loops.
+// An esp_timer callback runs in the esp_timer task instead, at the same
+// period, where taking the SPI lock is allowed. Pins are Brian Lough's ESP32 Matrix Shield (Mini 32): R1 on GPIO13
 // (SPI MOSI) and CLK on 14 through the SPI peripheral, the rest as below.
 #include "project/matrix/matrix.h"
 
 #include <Arduino.h>
+#include <esp_timer.h>
 
 #define double_buffer true   // PxMatrix reads this before its header
 #include <PxMatrix.h>
@@ -19,18 +25,14 @@
 // The panel's on-time per refresh in microseconds: the larger, the brighter.
 // 30 to 70 is safe; much more and the interrupt starves the loop.
 #define DISPLAY_DRAW_TIME 70
-// One refresh every 4 ms, from a 1 MHz timer.
-#define REFRESH_TIMER_HZ  1000000
-#define REFRESH_TICKS     4000
+// One refresh every 4 ms, as v1.
+#define REFRESH_PERIOD_US 4000
 
 static PxMATRIX display(MATRIX_W, MATRIX_H, PIN_LAT, PIN_OE, PIN_A, PIN_B, PIN_C, PIN_D);
-static hw_timer_t *s_timer = nullptr;
-static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
+static esp_timer_handle_t s_timer = nullptr;
 
-static void IRAM_ATTR displayUpdater() {
-  portENTER_CRITICAL_ISR(&s_mux);
+static void displayUpdater(void *) {
   display.display(DISPLAY_DRAW_TIME);
-  portEXIT_CRITICAL_ISR(&s_mux);
 }
 
 bool matrixBegin() {
@@ -38,12 +40,15 @@ bool matrixBegin() {
   display.setMuxDelay(0, 2, 0, 0, 0);  // needed by the SRYLED P4 panels
   display.flushDisplay();
   display.setTextWrap(false);
-  // Arduino core 3 timer API: a frequency, an ISR, an alarm in ticks.
-  s_timer = timerBegin(REFRESH_TIMER_HZ);
-  if (!s_timer) return false;
-  timerAttachInterrupt(s_timer, &displayUpdater);
-  timerAlarm(s_timer, REFRESH_TICKS, true, 0);
-  return true;
+  const esp_timer_create_args_t args = {
+    .callback = displayUpdater,
+    .arg = nullptr,
+    .dispatch_method = ESP_TIMER_TASK,
+    .name = "pxmatrix",
+    .skip_unhandled_events = true,   // a late refresh is skipped, not queued up
+  };
+  if (esp_timer_create(&args, &s_timer) != ESP_OK) return false;
+  return esp_timer_start_periodic(s_timer, REFRESH_PERIOD_US) == ESP_OK;
 }
 
 void matrixShow() {

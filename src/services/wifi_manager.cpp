@@ -20,8 +20,12 @@ static void stageHostname() {
 
 void wifiManagerPrepareScan() {
   mdnsStop();
-  WiFi.disconnect(true);
-  delay(100);
+  // Before the radio has been started (a headless first boot goes straight
+  // to the portal) there is nothing to disconnect, and asking logs an error.
+  if (WiFi.getMode() != WIFI_OFF) {
+    WiFi.disconnect(true);
+    delay(100);
+  }
   stageHostname();
   WiFi.mode(WIFI_STA);
   delay(100);

@@ -67,6 +67,13 @@ while IFS= read -r f; do
 done < <(grep -rlE '\.on\("/(api|update|status)' src)
 [ "$noreq" -eq 0 ] && ok "$routes routes, every API route gated"
 
+# 7b. Internal RAM is asked for byte-addressable. On a classic ESP32,
+#     MALLOC_CAP_INTERNAL alone may return IRAM, which only takes 32-bit
+#     accesses: the first byte written there is a LoadStoreError panic.
+hits=$(grep -rn 'MALLOC_CAP_INTERNAL' src | grep -v 'MALLOC_CAP_8BIT' \
+       | grep -vE 'heap_caps_get_|largest_free_block|^[^:]+:[0-9]+:\s*//' || true)
+if [ -n "$hits" ]; then bad "MALLOC_CAP_INTERNAL without MALLOC_CAP_8BIT:"; echo "$hits" | sed 's/^/        /'; else ok "internal allocations are byte-addressable"; fi
+
 # 8. The JavaScript the pages emit parses. Two levels of escaping, and the
 #    compiler checks only one.
 if command -v node >/dev/null 2>&1; then

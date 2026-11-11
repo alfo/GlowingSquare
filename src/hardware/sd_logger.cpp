@@ -81,12 +81,15 @@ static char sd_log_file[24] = "";
 // heap is the one that runs out.
 // With PSRAM the ring holds a whole session; without it, a smaller one in
 // internal RAM (about 10 kB) still covers the boot and the last minutes.
+// MALLOC_CAP_8BIT matters: on a classic ESP32, MALLOC_CAP_INTERNAL alone may
+// hand out IRAM, which only takes 32-bit accesses, and the first snprintf()
+// into it panics with a LoadStoreError.
 #ifdef BOARD_HAS_PSRAM
 #define LOG_RING_LINES 240
-#define LOG_RING_CAPS  MALLOC_CAP_SPIRAM
+#define LOG_RING_CAPS  (MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
 #else
 #define LOG_RING_LINES 80
-#define LOG_RING_CAPS  MALLOC_CAP_INTERNAL
+#define LOG_RING_CAPS  (MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT)
 #endif
 #define LOG_RING_WIDTH 120
 
