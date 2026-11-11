@@ -87,9 +87,10 @@ void appSetup() {
   loadPrefs();
   initSD();
 
-  // Counted as failed until the station gets an address; wifiOnConnected()
-  // clears it. A device that keeps failing opens its portal by itself.
-  if (cfg_wifi_ssid[0]) noteBootFailed(true);
+  // A boot that never gets an IP address is counted by appLoop() once it has
+  // waited WIFI_FAILED_BOOT_MS, not here: a brownout or a crash in the first
+  // seconds is a power or firmware problem, and counting those sent working
+  // devices back to the setup portal. wifiOnConnected() clears the count.
 
 #ifdef APP_UI_LVGL
   uiBegin();

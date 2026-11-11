@@ -44,7 +44,7 @@ void loadPrefs() {
   cfg_lang_set     = prefsGetBool("lang_set", LANG_COUNT == 1);
   cfg_first_boot   = prefsGetBool("first_boot", true);
   cfg_setup_resume = prefsGetBool("setup_resume", false);
-  cfg_failed_boots = prefsGetUChar("boot_fail", 0);
+  cfg_failed_boots = prefsGetUChar("boot_fails", 0);
 
   gh_prerelease    = prefsGetBool("gh_prerelease", false);
   g_upd_autocheck  = prefsGetBool("upd_check", true);
@@ -87,5 +87,5 @@ void noteBootFailed(bool failed) {
   const uint8_t next = failed ? (uint8_t)min(255, cfg_failed_boots + 1) : 0;
   if (next == cfg_failed_boots) return;
   cfg_failed_boots = next;
-  prefsPutUChar("boot_fail", next);
+  prefsPutUChar("boot_fails", next);
 }

@@ -18,6 +18,7 @@
 #include "services/mdns_service.h"
 #include "services/ota_state.h"
 #include "services/prefs_store.h"
+#include "services/app_settings.h"
 #include "services/provisioning.h"
 #include "services/setup_portal.h"
 #include "services/update_check.h"
@@ -39,6 +40,10 @@ constexpr unsigned long WIFI_OUTAGE_LOG_MS = 5UL * 60UL * 1000UL;
 // What counts as nobody using the device, for the roaming check: no browser
 // on the web interface for this long (and, with a screen, the screen idle).
 constexpr unsigned long WIFI_ROAM_WEB_QUIET_MS = 2UL * 60UL * 1000UL;
+
+// A boot that has had a stored network for this long without an IP address
+// counts towards PORTAL_AFTER_FAILED_BOOTS.
+constexpr unsigned long WIFI_FAILED_BOOT_MS = 60000;
 
 // Below this many free bytes on the loop task's stack, the log says so.
 constexpr uint32_t STACK_WARN_BYTES = 3072;
@@ -96,7 +101,19 @@ static bool wifiSomeoneElseBusy() {
   return false;
 }
 
+// Once per boot: a whole minute with a network stored and no address.
+static void failedBootTick() {
+  static bool counted = false;
+  if (counted || wifi_ok || cfg_wifi_ssid[0] == '\0' || millis() < WIFI_FAILED_BOOT_MS) return;
+  if (setupPortalActive() || provisioningActive()) return;   // someone is setting it up
+  counted = true;
+  noteBootFailed(true);
+  logSDf("WiFi: no address after %lu s, failed boot %u of %u before the setup portal",
+         WIFI_FAILED_BOOT_MS / 1000, (unsigned)cfg_failed_boots, (unsigned)PORTAL_AFTER_FAILED_BOOTS);
+}
+
 static void handleWifiReconnect() {
+  failedBootTick();
   if (cfg_wifi_ssid[0] == '\0') return;
   if (wifiSomeoneElseBusy()) return;
 

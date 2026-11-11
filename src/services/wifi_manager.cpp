@@ -18,6 +18,16 @@ static void stageHostname() {
   WiFi.setHostname(deviceLabel());
 }
 
+// A project whose supply sags when the radio transmits sets APP_WIFI_TX_POWER
+// (a wifi_power_t, e.g. WIFI_POWER_15dBm) in project_config.h: smaller
+// current spikes, at a small cost in range. Unset, the core's default
+// (19.5 dBm) stands.
+static void applyTxPower() {
+#ifdef APP_WIFI_TX_POWER
+  WiFi.setTxPower(APP_WIFI_TX_POWER);
+#endif
+}
+
 void wifiManagerPrepareScan() {
   mdnsStop();
   // Before the radio has been started (a headless first boot goes straight
@@ -99,6 +109,7 @@ bool wifiManagerStartAp(const char* ssid, const char* password, IPAddress ip, IP
   mdnsStop();
   if (!WiFi.mode(WIFI_AP)) return false;
   if (!WiFi.softAP(ssid, password)) return false;
+  applyTxPower();
   // The device is its own gateway: a phone only looks for a captive portal on
   // a network that claims a route out.
   return WiFi.softAPConfig(ip, ip, netmask);
@@ -156,6 +167,7 @@ void wifiManagerBegin(const char* ssid, const char* password,
   // long as it is up (ESP-IDF coexistence).
   WiFi.setSleep(false);
 #endif
+  applyTxPower();
   WiFi.begin(ssid, password, channel, bssid);
 }
 

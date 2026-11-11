@@ -7,6 +7,7 @@
 #include <cassert>
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 #include "project/gs_http.h"
 #include "project/gs_state.h"
@@ -114,6 +115,22 @@ int main(int argc, char **argv) {
   drawOffline();
   dump("offline");
   assert(px(63, 31) == rgb565(255, 0, 0));
+
+  // ---- ScrollRow: hold still, then scroll; text that fits never moves ----
+  {
+    matrixCanvas().fillScreen(0);
+    ScrollRow row;
+    row.start(8, "W:", "Glowing Square-1C70", 0xFFFF, 0xFFFF, 70, 4000, true);
+    assert(!row.done());                                   // too long: it will scroll
+    std::vector<uint16_t> before(matrixCanvas().getBuffer(), matrixCanvas().getBuffer() + 2048);
+    for (uint32_t t = 0; t < 3900; t += 10) { g_fake_ms += 10; row.tick(g_fake_ms); }
+    assert(std::equal(before.begin(), before.end(), matrixCanvas().getBuffer()));   // still held
+    for (uint32_t t = 0; t < 400; t += 10) { g_fake_ms += 10; row.tick(g_fake_ms); }
+    assert(!std::equal(before.begin(), before.end(), matrixCanvas().getBuffer()));  // moving now
+    ScrollRow pass;
+    pass.start(16, "P:", "hpyzw77u", 0xFFFF, 0xFFFF, 70, 4000, true);
+    assert(pass.done());                                   // fits: drawn still, no scrolling
+  }
 
   printf("host render: ok\n");
   return 0;

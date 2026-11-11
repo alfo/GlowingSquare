@@ -22,6 +22,11 @@
 // London, with summer time.
 #define APP_DEFAULT_TZ    "GMT0BST,M3.5.0/1,M10.5.0"
 
+// The panel and the ESP32 share one 5V supply, and the radio's transmit
+// spikes sagged it far enough to brown the board out. 15 dBm is plenty
+// indoors.
+#define APP_WIFI_TX_POWER WIFI_POWER_15dBm
+
 // The device shows the setup WiFi's name and password on the matrix itself,
 // so the network does not have to be open.
 #define APP_PORTAL_SECURE

@@ -56,27 +56,44 @@ static ScrollRow s_portal_row[3];
 static bool s_portal_shown = false;
 
 // Three rows that keep scrolling: the network, its password, the address.
-static void portalShow(bool open) {
-  s_portal_shown = open;
-  matrixCanvas().fillScreen(0);
-  if (!open) {
-    modeOps(g_mode).enter();
-    return;
-  }
+// How long each line of the setup screen stands still before it moves, and
+// how fast it then goes. Long enough to read a password off the panel.
+#define PORTAL_HOLD_MS  4000
+#define PORTAL_STEP_MS  70
+
+static void portalRound() {
   char url[32];
   setupPortalUrl(url, sizeof(url));
   const uint16_t C_KEY = rgb565(255, 80, 0), C_VAL = rgb565(200, 200, 200);
+  matrixCanvas().fillScreen(0);
   drawText(0, 0, "Setup", rgb565(0, 255, 255));
-  s_portal_row[0].start(8, "W:", setupPortalSsid(), C_KEY, C_VAL, 60);
-  s_portal_row[1].start(16, "P:", setupPortalPassword(), C_KEY, C_VAL, 60);
-  s_portal_row[2].start(24, "", url + 7, C_KEY, C_VAL, 60);   // without "http://"
+  // Lines that fit stay still; the rest hold, scroll once and snap back.
+  s_portal_row[0].start(8, "W:", setupPortalSsid(), C_KEY, C_VAL, PORTAL_STEP_MS, PORTAL_HOLD_MS, true);
+  s_portal_row[1].start(16, "P:", setupPortalPassword(), C_KEY, C_VAL, PORTAL_STEP_MS, PORTAL_HOLD_MS, true);
+  s_portal_row[2].start(24, "", url + 7, C_KEY, C_VAL, PORTAL_STEP_MS, PORTAL_HOLD_MS, true);   // no "http://"
 }
 
+static void portalShow(bool open) {
+  s_portal_shown = open;
+  if (!open) {
+    matrixCanvas().fillScreen(0);
+    modeOps(g_mode).enter();
+    return;
+  }
+  portalRound();
+}
+
+// A round ends when every moving line is back at its start; the next one
+// holds them all still again. If nothing needs to move, nothing happens.
 static bool portalFrame(uint32_t now) {
-  bool drew = false;
+  bool drew = false, moving = false;
   for (ScrollRow &r : s_portal_row) {
     drew |= r.tick(now);
-    if (r.done()) { portalShow(true); return true; }   // round again
+    moving |= !r.done();
+  }
+  if (!moving && drew) {
+    portalRound();
+    return true;
   }
   return drew;
 }

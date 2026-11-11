@@ -32,10 +32,15 @@ void drawOffline();
 // One row of "static prefix, then text scrolling past it". start() draws the
 // first frame; tick() moves it on by a pixel when its step is due and
 // returns true when it drew; done() once it has snapped back.
+//
+// hold_ms keeps the text still at its start for that long before it moves,
+// so it can be read. With only_if_needed, text that fits the row is drawn
+// still and the row is done at once.
 class ScrollRow {
  public:
   void start(int16_t y, const char *stat, const char *scroll, uint16_t c_static,
-             uint16_t c_scroll, uint32_t step_ms);
+             uint16_t c_scroll, uint32_t step_ms, uint32_t hold_ms = 0,
+             bool only_if_needed = false);
   bool tick(uint32_t now);
   bool done() const { return !active_; }
   void stop() { active_ = false; }

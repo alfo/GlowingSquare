@@ -47,7 +47,8 @@ void ScrollRow::drawAt(int16_t x) {
 }
 
 void ScrollRow::start(int16_t y, const char *stat, const char *scroll, uint16_t c_static,
-                      uint16_t c_scroll, uint32_t step_ms) {
+                      uint16_t c_scroll, uint32_t step_ms, uint32_t hold_ms,
+                      bool only_if_needed) {
   snprintf(stat_, sizeof(stat_), "%s", stat);
   snprintf(scroll_, sizeof(scroll_), "%s", scroll);
   y_ = y;
@@ -60,7 +61,12 @@ void ScrollRow::start(int16_t y, const char *stat, const char *scroll, uint16_t 
   limit_ = -(MATRIX_W + (int16_t)strlen(scroll_) * CHAR_W_SCROLL) + 50;
   x_ = offset_;
   drawAt(x_);
-  next_ms_ = millis() + step_ms_;
+  const bool fits = offset_ + (int16_t)strlen(scroll_) * CHAR_ADVANCE <= MATRIX_W;
+  if (only_if_needed && fits) {
+    active_ = false;
+    return;
+  }
+  next_ms_ = millis() + hold_ms + step_ms_;
   active_ = true;
 }
 
