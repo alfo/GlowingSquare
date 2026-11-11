@@ -59,9 +59,18 @@ static void refreshTask(void *) {
 
 uint32_t matrixRefreshCount() { return s_refreshes; }
 
+// v1 waited 2 us after address line B only, which the SRYLED P4 panels
+// needed. Some panels show the rows before an all-lines change (7 and 15 on
+// a 1/16 scan) flickering: their decoder needs longer to settle there.
+// g_px_mux_us adds a wait after every line, B never below v1's 2 us.
+static void applyMuxDelay() {
+  const uint8_t d = (uint8_t)g_px_mux_us;
+  display.setMuxDelay(d, d > 2 ? d : 2, d, d, 0);
+}
+
 bool matrixBegin() {
   display.begin(16);                   // 1/16 scan
-  display.setMuxDelay(0, 2, 0, 0, 0);  // needed by the SRYLED P4 panels
+  applyMuxDelay();
   display.flushDisplay();
   display.setTextWrap(false);
   // Above the loop task and everything else an application runs on core 1;
@@ -78,9 +87,11 @@ bool matrixBegin() {
   return true;
 }
 
-// A new period takes effect at once; the on-time is read on every refresh.
+// A new period or row settle time takes effect at once; the on-time is read
+// on every refresh.
 void matrixApplyTiming() {
   if (s_timer) timerAlarm(s_timer, (uint64_t)g_px_period_us, true, 0);
+  applyMuxDelay();
 }
 
 void matrixShow() {

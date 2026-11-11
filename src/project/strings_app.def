@@ -86,6 +86,9 @@ S(STR_P_PX_PERIOD_INFO, "One refresh every this long. v1 used 4000. Shorter move
 S(STR_P_PX_ON,          "On-time per row")
 S(STR_P_PX_ON_INFO,     "How long each row is lit per refresh. v1 used 70. Lower is dimmer and draws less current per burst.")
 
+S(STR_P_PX_MUX,         "Row switch settle time")
+S(STR_P_PX_MUX_INFO,    "A wait after setting each row address line. 3 steadied rows 7 and 15 on the original displays. Raise it if a row before an address change flickers; v1 used 0.")
+
 // ---- Pins ----
 S(STR_P_PIN_R1, "R1")
 S(STR_P_PIN_G1, "G1")

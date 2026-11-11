@@ -113,6 +113,8 @@ const SettingDesc SETTINGS[] = {
       .unitLabel("µs").info(STR_P_PX_PERIOD_INFO).onChange(timingChanged),
   settingInt("px_on", SEC_PANEL, &g_px_on_us, STR_P_PX_ON, 70, 10, 200)
       .unitLabel("µs").info(STR_P_PX_ON_INFO),
+  settingInt("px_mux", SEC_PANEL, &g_px_mux_us, STR_P_PX_MUX, 3, 0, 20)
+      .unitLabel("µs").info(STR_P_PX_MUX_INFO).onChange(timingChanged),
 #endif
 
 #ifdef MATRIX_DMA

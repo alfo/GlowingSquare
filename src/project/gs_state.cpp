@@ -40,6 +40,7 @@ bool    g_mqtt_ha          = true;
 #ifdef MATRIX_PXMATRIX
 int32_t g_px_period_us = 4000;
 int32_t g_px_on_us     = 70;
+int32_t g_px_mux_us    = 3;
 #endif
 
 #ifdef MATRIX_DMA

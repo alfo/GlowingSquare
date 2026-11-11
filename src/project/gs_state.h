@@ -53,6 +53,7 @@ extern bool    g_mqtt_ha;          // Home Assistant discovery
 #ifdef MATRIX_PXMATRIX
 extern int32_t g_px_period_us;     // one refresh every this long (v1: 4000)
 extern int32_t g_px_on_us;         // a row's on-time per refresh (v1: 70)
+extern int32_t g_px_mux_us;        // settle time after each row address line (default 3; v1: 0, B 2)
 #endif
 
 // ---- HUB75 pins (DMA builds) -----------------------------------------------
