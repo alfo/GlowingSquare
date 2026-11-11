@@ -26,5 +26,9 @@
       "manifest": "fw/gs-s3-dma/manifest.json",
       "version": "v2.0.0-beta.1"
     }
-  ]
+  ],
+  "accent": {
+    "dark": "#ff7a1a",
+    "light": "#b84d00"
+  }
 }
