@@ -1,6 +1,6 @@
 {
   "name": "Glowing Square (D1 Mini 32 + Brian Lough Matrix Shield)",
-  "version": "v2.0.0-beta.4",
+  "version": "v2.0.0-beta.5",
   "new_install_prompt_erase": true,
   "builds": [
     {
