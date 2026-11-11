@@ -32,3 +32,12 @@ struct GsHttp {
 // log whenever the answer is not a 2xx parsed cleanly.
 int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
                char *err, size_t err_n);
+
+// The same request, for an answer whose bulk is one array under `list`
+// (project/json_walk.h): each element is parsed through `filter` on its own
+// and handed to `each(el, ctx)`, so the array never has to fit in RAM. Read
+// to the last byte even when the server ends the body by closing.
+// buffer_max is ignored.
+typedef void (*GsJsonEach)(JsonObjectConst el, void *ctx);
+int gsHttpJsonEach(const GsHttp &req, const char *list, const JsonDocument &filter,
+                   GsJsonEach each, void *ctx, char *err, size_t err_n);

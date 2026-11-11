@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "project/gs_http.h"
+#include "project/json_walk.h"
 #include "project/gs_state.h"
 #include "project/matrix/matrix.h"
 #include "project/modes/modes.h"
@@ -28,28 +29,88 @@ static std::string slurp(const std::string &path) {
 // Every request answered from a file, picked by a piece of its URL. The
 // filter is applied exactly as on the device.
 static std::string g_last_url;
+static std::vector<std::string> g_urls;   // every request, in order
+static const char *g_down = nullptr;      // a host that refuses, as on the device
 
-int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter, char *err, size_t n) {
-  g_last_url = req.url;
+// The fixture for a URL, or "" with err set: the refusal of a host that is
+// down, or no fixture at all.
+static std::string answerFor(const char *url, int &code, char *err, size_t n) {
+  g_last_url = url;
+  g_urls.push_back(url);
+  if (g_down && strstr(url, g_down)) {
+    snprintf(err, n, "connection refused");
+    code = -1;
+    return "";
+  }
   static const struct { const char *part, *file; } MAP[] = {
     { "api.tfl.gov.uk/StopPoint",    "tfl_nhg_stop.json" },
     { "api.tfl.gov.uk",              "tfl_victoria_oxc.json" },
     { "api.adsb.lol",                "adsb_london.json" },
+    { "opendata.adsb.fi",            "adsbfi_london.json" },
     { "api.adsbdb.com",              "adsbdb_THA917.json" },
     { "stat/sta",                    "unifi_sta.json" },
     { "stat/report/5minutes.site",   "unifi_5min.json" },
     { "stat/report/daily.site",      "unifi_daily.json" },
   };
   for (auto &m : MAP) {
-    if (!strstr(req.url, m.part)) continue;
-    const std::string body = slurp(g_fixtures + "/" + m.file);
-    auto e = filter ? deserializeJson(out, body, DeserializationOption::Filter(*filter))
-                    : deserializeJson(out, body);
-    if (e) { snprintf(err, n, "JSON: %s", e.c_str()); return -2; }
-    return 200;
+    if (!strstr(url, m.part)) continue;
+    code = 200;
+    return slurp(g_fixtures + "/" + m.file);
   }
-  snprintf(err, n, "no fixture for %s", req.url);
-  return 404;
+  snprintf(err, n, "no fixture for %s", url);
+  code = 404;
+  return "";
+}
+
+int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter, char *err, size_t n) {
+  int code;
+  const std::string body = answerFor(req.url, code, err, n);
+  if (code != 200) return code;
+  auto e = filter ? deserializeJson(out, body, DeserializationOption::Filter(*filter))
+                  : deserializeJson(out, body);
+  if (e) { snprintf(err, n, "JSON: %s", e.c_str()); return -2; }
+  return 200;
+}
+
+// The device's walk over the fixture's bytes, read one at a time as off a
+// socket, so json_walk.h is tested on the recorded answers themselves.
+struct StringSource {
+  const std::string &s;
+  size_t pos = 0;
+  int read() { return pos < s.size() ? (uint8_t)s[pos++] : -1; }
+};
+
+int gsHttpJsonEach(const GsHttp &req, const char *list, const JsonDocument &filter,
+                   GsJsonEach each, void *ctx, char *err, size_t n) {
+  int code;
+  const std::string body = answerFor(req.url, code, err, n);
+  if (code != 200) return code;
+  StringSource src{body};
+  auto e = jsonWalkArray(src, list, filter, [&](JsonObjectConst el) { each(el, ctx); });
+  if (e) { snprintf(err, n, "JSON: %s", e.c_str()); return -2; }
+  return 200;
+}
+
+// ---- json_walk.h on its own: the edges a recorded answer does not have ----
+static int walkCount(const char *json, const char *key, DeserializationError *out = nullptr) {
+  std::string s(json);
+  StringSource src{s};
+  JsonDocument filter;
+  filter["k"] = true;
+  int count = 0;
+  auto e = jsonWalkArray(src, key, filter, [&](JsonObjectConst el) { count += el["k"] | 0; });
+  if (out) *out = e;
+  return count;
+}
+
+static void testJsonWalk() {
+  DeserializationError e;
+  assert(walkCount("{\"ac\":[{\"k\":1},{\"k\":2,\"x\":[1,{}]} , {\"k\":4}],\"n\":1}", "ac", &e) == 7 && !e);
+  assert(walkCount("{\"msg\":\"ac\",\"ac\" : [ ]}", "ac", &e) == 0 && !e);       // "ac" as a value first
+  assert(walkCount("{\"aircraft\":[{\"k\":1},{\"k\":2}", "aircraft", &e) == 3);  // cut off
+  assert(e == DeserializationError::IncompleteInput);
+  walkCount("{\"now\":1}", "ac", &e);
+  assert(e == DeserializationError::IncompleteInput);                            // never found
 }
 
 static void dump(const char *name) {
@@ -118,6 +179,8 @@ int main(int argc, char **argv) {
   g_tfl_plat_filter[0] = '\0';
   snprintf(g_tfl_line, sizeof g_tfl_line, "victoria");
 
+  testJsonWalk();
+
   // ---- Flights: central London ----
   snprintf(g_fl_lat, sizeof g_fl_lat, "51.5074");
   snprintf(g_fl_lon, sizeof g_fl_lon, "-0.1278");
@@ -128,6 +191,19 @@ int main(int argc, char **argv) {
   dump("flights");
   assert(rowHasColour(0, rgb565(0, 255, 255)));        // LHR>BKK
   assert(rowHasColour(16, rgb565(255, 0, 0)));         // 9050ft: below 10,000, red
+
+  // adsb.lol down: the same flight from adsb.fi, which is then asked first.
+  g_down = "api.adsb.lol";
+  matrixCanvas().fillScreen(0);
+  g_urls.clear();
+  fetchCommit(MODE_FLIGHTS_OPS);
+  assert(g_urls.size() >= 2 && g_urls[0].find("api.adsb.lol") != std::string::npos);
+  assert(g_urls[1].find("opendata.adsb.fi/api/v2/lat/51.5074/lon/-0.1278/dist/10") != std::string::npos);
+  assert(rowHasColour(0, rgb565(0, 255, 255)));        // LHR>BKK again
+  g_urls.clear();
+  fetchCommit(MODE_FLIGHTS_OPS);
+  assert(g_urls[0].find("opendata.adsb.fi") != std::string::npos);
+  g_down = nullptr;
 
   // ---- Unifi ----
   snprintf(g_unifi_url, sizeof g_unifi_url, "https://192.168.1.1");

@@ -32,7 +32,8 @@ The v1 sketches are kept under the [`v1-legacy`](../../tree/v1-legacy) tag.
   flashes the firmware over USB and hands the device your WiFi. After that,
   updates arrive over the air from GitHub Releases.
 - **No more PHP.** Unifi mode talks to your console directly, with an API key.
-- **Flights from open data.** [adsb.lol](https://adsb.lol) and
+- **Flights from open data.** [adsb.lol](https://adsb.lol), with
+  [adsb.fi](https://adsb.fi) when it is down, and
   [adsbdb](https://www.adsbdb.com) replace the unofficial Flightradar24 feed.
 - **Home Assistant.** MQTT discovery adds a light (on/off, brightness) and
   selects for the mode and party mode. v1's topics still work.

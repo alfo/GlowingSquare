@@ -7,7 +7,7 @@ S(STR_P_SEC_DISPLAY_INFO, "What the matrix shows. Each mode keeps the layout it 
 S(STR_P_SEC_TUBE,         "Tube / London Bus")
 S(STR_P_SEC_TUBE_INFO,    "Departures from one stop, from TfL. Tube and bus stops work the same way.")
 S(STR_P_SEC_FLIGHTS,      "Flights")
-S(STR_P_SEC_FLIGHTS_INFO, "The nearest aircraft overhead, from adsb.lol, with its route from adsbdb.com.")
+S(STR_P_SEC_FLIGHTS_INFO, "The nearest aircraft overhead, from adsb.lol or adsb.fi, with its route from adsbdb.com.")
 S(STR_P_SEC_UNIFI,        "Unifi")
 S(STR_P_SEC_UNIFI_INFO,   "Network statistics, read straight from your UniFi console. No helper server needed any more.")
 S(STR_P_SEC_MQTT,         "MQTT")
