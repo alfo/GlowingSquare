@@ -27,6 +27,11 @@ struct GsHttp {
   // Required", since 12.11.2026). Asked with Connection: close and read to
   // the Content-Length; an answer sent chunked is reported, not parsed.
   bool         http11 = false;
+  // gsHttpJsonEach only: walk the answer straight off the socket instead of
+  // reading it whole first, for an answer bigger than RAM (UniFi's client
+  // list, some 2 kB a client: v1 needed a PHP server for it). Only a 512-byte
+  // buffer and one element are ever held.
+  bool         stream = false;
   // Filled when given: the Set-Cookie and X-CSRF-Token answers (UniFi login).
   String      *set_cookie = nullptr;
   String      *csrf       = nullptr;

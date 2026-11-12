@@ -1,7 +1,10 @@
 // Unifi: network statistics straight from the UniFi console. v1 needed a PHP
 // script on a server between the two, because the answers were too big for
-// the ESP32's RAM; parsing them off the socket through a filter keeps only
-// the handful of fields drawn.
+// the ESP32's RAM. Each answer's "data" array is walked straight off the
+// socket an element at a time (gsHttpJsonEach, GsHttp::stream), keeping only
+// the handful of fields drawn, however many clients there are. Parsed by
+// ArduinoJson off the socket at its own pace instead, the client list
+// arrived cut off (IncompleteInput, 12.11.2026), as TfL's had.
 //
 // What it reads, all through the Network application's API:
 //   stat/sta                   clients: count, guests, the newest one
@@ -42,6 +45,7 @@ struct UnifiData {
   uint8_t  graph[MATRIX_W] = {0};
   char     newest[40] = "";
   uint32_t min_uptime = UINT32_MAX;
+  char     warn[96] = "";   // an extra that failed, logged by commit()
 };
 
 static UnifiData s_next, s_cur;
@@ -112,21 +116,31 @@ static bool login(char *err, size_t err_n) {
   return true;
 }
 
-// One call to the Network application. A refused session is renewed once.
-static int api(const char *path, const char *body, const JsonDocument &filter,
-               JsonDocument &out, char *err, size_t err_n) {
+// One call to the Network application: its "data" array, an element at a
+// time through `filter`, to `each`.
+struct ApiCall {
+  const char         *path;
+  const char         *body;     // POSTed when set
+  const JsonDocument *filter;   // for one element of "data"
+  GsJsonEach          each;
+  void               *ctx;
+};
+
+// A refused session is renewed once.
+static int api(const ApiCall &call, char *err, size_t err_n) {
   char url[192], b[64];
   base(b, sizeof(b));
   snprintf(url, sizeof(url), "%s%s/api/s/%s/%s", b, isClassic() ? "" : "/proxy/network",
-           g_unifi_site, path);
+           g_unifi_site, call.path);
 
   for (int attempt = 0; attempt < 2; attempt++) {
     if (g_unifi_auth != UNIFI_AUTH_KEY && !s_cookie.length() && !login(err, err_n)) return -1;
     GsHttp req;
     req.url = url;
-    req.method = body ? "POST" : "GET";
-    req.body = body;
+    req.method = call.body ? "POST" : "GET";
+    req.body = call.body;
     req.verify_tls = g_unifi_verify_tls;
+    req.stream = true;   // the client list can be more than RAM
     int h = 0;
     if (g_unifi_auth == UNIFI_AUTH_KEY) {
       req.headers[h++] = "X-API-KEY";
@@ -136,7 +150,7 @@ static int api(const char *path, const char *body, const JsonDocument &filter,
       req.headers[h++] = s_cookie.c_str();
       if (s_csrf.length()) { req.headers[h++] = "X-CSRF-Token"; req.headers[h++] = s_csrf.c_str(); }
     }
-    const int code = gsHttpJson(req, out, &filter, err, err_n);
+    const int code = gsHttpJsonEach(req, "data", *call.filter, call.each, call.ctx, err, err_n);
     if ((code == 401 || code == 403) && g_unifi_auth != UNIFI_AUTH_KEY && attempt == 0) {
       s_cookie = "";
       continue;
@@ -148,26 +162,70 @@ static int api(const char *path, const char *body, const JsonDocument &filter,
 
 // ---- fetch (worker task) ----------------------------------------------------
 
+// One client: counted, and kept as the newest if it joined last.
+static void countClient(JsonObjectConst c, void *ctx) {
+  UnifiData &d = *(UnifiData *)ctx;
+  if (c["is_guest"] | false) d.guests++;
+  else                       d.clients++;
+  const uint32_t up = c["uptime"] | UINT32_MAX;
+  if (up >= d.min_uptime) return;
+  d.min_uptime = up;
+  const char *n = c["hostname"] | "";
+  if (!n[0]) n = c["name"] | "";
+  snprintf(d.newest, sizeof(d.newest), "%s", n);
+}
+
 static bool readClients(char *err, size_t err_n) {
-  JsonDocument filter, doc;
-  JsonObject f = filter["data"][0].to<JsonObject>();
-  f["hostname"] = true;
-  f["name"] = true;
-  f["uptime"] = true;
-  f["is_guest"] = true;
-  if (!gsHttpOk(api("stat/sta", nullptr, filter, doc, err, err_n))) return false;
-  for (JsonObjectConst c : doc["data"].as<JsonArrayConst>()) {
-    if (c["is_guest"] | false) s_next.guests++;
-    else                       s_next.clients++;
-    const uint32_t up = c["uptime"] | UINT32_MAX;
-    if (up < s_next.min_uptime) {
-      s_next.min_uptime = up;
-      const char *n = c["hostname"] | "";
-      if (!n[0]) n = c["name"] | "";
-      snprintf(s_next.newest, sizeof(s_next.newest), "%s", n);
-    }
+  JsonDocument filter;
+  filter["hostname"] = true;
+  filter["name"] = true;
+  filter["uptime"] = true;
+  filter["is_guest"] = true;
+  const ApiCall call = { "stat/sta", nullptr, &filter, countClient, &s_next };
+  return gsHttpOk(api(call, err, err_n));
+}
+
+// The 5-minute buckets as they come, oldest first: the last
+// GRAPH_SCALE_POINTS of them, in a ring. The fetch task's alone.
+struct Buckets {
+  float    v[GRAPH_SCALE_POINTS];
+  uint16_t n = 0;          // buckets seen
+  uint16_t with = 0;       // of them, with the figure asked for
+  char     keys[48] = "";  // the first one's fields, when it lacked it
+};
+static Buckets s_buckets;
+
+// The fields of an element, for the log: what a console answers when it
+// does not have the one asked for.
+static void keysOf(JsonObjectConst o, char *out, size_t n) {
+  out[0] = '\0';
+  for (JsonPairConst kv : o) {
+    const size_t len = strlen(out);
+    snprintf(out + len, n - len, "%s%s", len ? "," : "", kv.key().c_str());
   }
-  return true;
+}
+
+static void addBucket(JsonObjectConst b, void *ctx) {
+  Buckets &k = *(Buckets *)ctx;
+  JsonVariantConst v = b["wan-rx_bytes"];
+  if (!v.isNull()) k.with++;
+  else if (!k.keys[0]) keysOf(b, k.keys, sizeof(k.keys));
+  k.v[k.n % GRAPH_SCALE_POINTS] = v | 0.0f;
+  k.n++;
+}
+
+// Why a report drew nothing, when it did not: no entries at all, or none
+// with the figure. "" when it had some.
+static void reportGap(const char *what, uint16_t n, uint16_t with, const char *keys,
+                      char *out, size_t out_n) {
+  if (with) return;
+  if (!n) snprintf(out, out_n, "%s: the console sent no entries", what);
+  else    snprintf(out, out_n, "%s: %u entries, none with wan bytes (%s)", what, (unsigned)n, keys);
+}
+
+// Bucket i of the last `count`, oldest first.
+static float bucketAt(const Buckets &k, int count, int i) {
+  return k.v[(k.n - count + i) % GRAPH_SCALE_POINTS];
 }
 
 static bool readGraph(char *err, size_t err_n) {
@@ -177,22 +235,38 @@ static bool readGraph(char *err, size_t err_n) {
   snprintf(body, sizeof(body), "{\"attrs\":[\"wan-rx_bytes\",\"time\"],\"start\":%llu,\"end\":%llu}",
            (unsigned long long)(now_ms - (uint64_t)GRAPH_SCALE_POINTS * BUCKET_MS),
            (unsigned long long)now_ms);
-  JsonDocument filter, doc;
-  filter["data"][0]["wan-rx_bytes"] = true;
-  if (!gsHttpOk(api("stat/report/5minutes.site", body, filter, doc, err, err_n))) return false;
+  JsonDocument filter;
+  filter.set(true);   // an entry is a few fields: all of them, for reportGap()
+  s_buckets = Buckets();
+  const ApiCall call = { "stat/report/5minutes.site", body, &filter, addBucket, &s_buckets };
+  if (!gsHttpOk(api(call, err, err_n))) return false;
+  reportGap("graph", s_buckets.n, s_buckets.with, s_buckets.keys, s_next.warn, sizeof(s_next.warn));
 
-  JsonArrayConst data = doc["data"].as<JsonArrayConst>();
-  const int n = (int)data.size();
-  double max_bytes = 0;
-  for (int i = max(0, n - GRAPH_SCALE_POINTS); i < n; i++)
-    max_bytes = fmax(max_bytes, data[i]["wan-rx_bytes"] | 0.0);
+  const int n = s_buckets.n < GRAPH_SCALE_POINTS ? s_buckets.n : GRAPH_SCALE_POINTS;
+  float max_bytes = 0;
+  for (int i = 0; i < n; i++) max_bytes = fmaxf(max_bytes, bucketAt(s_buckets, n, i));
   // The newest 64 buckets from the left edge, like v1's array_slice(-64).
-  const int first = max(0, n - MATRIX_W);
-  for (int i = first, x = 0; i < n; i++, x++) {
-    const double b = data[i]["wan-rx_bytes"] | 0.0;
-    s_next.graph[x] = max_bytes > 0 ? (uint8_t)ceil(b / max_bytes * GRAPH_HEIGHT) : 0;
+  const int shown = n < MATRIX_W ? n : MATRIX_W;
+  for (int x = 0; x < shown; x++) {
+    const float b = bucketAt(s_buckets, n, n - shown + x);
+    s_next.graph[x] = max_bytes > 0 ? (uint8_t)ceilf(b / max_bytes * GRAPH_HEIGHT) : 0;
   }
   return true;
+}
+
+struct MonthTotals {
+  double   rx = 0, tx = 0;
+  uint16_t n = 0, with = 0;
+  char     keys[48] = "";
+};
+
+static void addDay(JsonObjectConst d, void *ctx) {
+  MonthTotals &t = *(MonthTotals *)ctx;
+  t.n++;
+  if (!d["wan-rx_bytes"].isNull()) t.with++;
+  else if (!t.keys[0]) keysOf(d, t.keys, sizeof(t.keys));
+  t.rx += d["wan-rx_bytes"] | 0.0;
+  t.tx += d["wan-tx_bytes"] | 0.0;
 }
 
 static bool readMonth(char *err, size_t err_n) {
@@ -206,17 +280,15 @@ static bool readMonth(char *err, size_t err_n) {
   snprintf(body, sizeof(body),
            "{\"attrs\":[\"wan-rx_bytes\",\"wan-tx_bytes\",\"time\"],\"start\":%llu,\"end\":%llu}",
            (unsigned long long)start * 1000ULL, (unsigned long long)now * 1000ULL);
-  JsonDocument filter, doc;
-  filter["data"][0]["wan-rx_bytes"] = true;
-  filter["data"][0]["wan-tx_bytes"] = true;
-  if (!gsHttpOk(api("stat/report/daily.site", body, filter, doc, err, err_n))) return false;
-  double rx = 0, tx = 0;
-  for (JsonObjectConst d : doc["data"].as<JsonArrayConst>()) {
-    rx += d["wan-rx_bytes"] | 0.0;
-    tx += d["wan-tx_bytes"] | 0.0;
-  }
-  formatBytes(rx, s_next.month_rx, sizeof(s_next.month_rx));
-  formatBytes(tx, s_next.month_tx, sizeof(s_next.month_tx));
+  JsonDocument filter;
+  filter.set(true);
+  MonthTotals totals;
+  const ApiCall call = { "stat/report/daily.site", body, &filter, addDay, &totals };
+  if (!gsHttpOk(api(call, err, err_n))) return false;
+  if (!s_next.warn[0])
+    reportGap("month", totals.n, totals.with, totals.keys, s_next.warn, sizeof(s_next.warn));
+  formatBytes(totals.rx, s_next.month_rx, sizeof(s_next.month_rx));
+  formatBytes(totals.tx, s_next.month_tx, sizeof(s_next.month_tx));
   return true;
 }
 
@@ -226,10 +298,13 @@ static bool unifiFetch(char *err, size_t err_n) {
   s_next = UnifiData();
   if (!readClients(err, err_n)) return false;
   // The graph and the totals are extras: a console that refuses one of them
-  // still shows the clients, and the log says which call failed.
+  // still shows the clients, and commit() logs which call failed (the log is
+  // the loop task's).
   char e2[64];
-  if (!readGraph(e2, sizeof(e2)))  logSDf("Unifi: graph unavailable (%s)", e2);
-  if (!readMonth(e2, sizeof(e2)))  logSDf("Unifi: month totals unavailable (%s)", e2);
+  if (!readGraph(e2, sizeof(e2)))
+    snprintf(s_next.warn, sizeof(s_next.warn), "graph unavailable (%s)", e2);
+  else if (!readMonth(e2, sizeof(e2)))
+    snprintf(s_next.warn, sizeof(s_next.warn), "month totals unavailable (%s)", e2);
   return true;
 }
 
@@ -269,7 +344,12 @@ static void draw() {
 }
 
 static void unifiEnter()  { draw(); }
-static void unifiCommit() { s_cur = s_next; draw(); }
+static void unifiCommit() {
+  // Logged once a change: the same failure every 30 s says nothing new.
+  if (s_next.warn[0] && strcmp(s_next.warn, s_cur.warn) != 0) logSDf("Unifi: %s", s_next.warn);
+  s_cur = s_next;
+  draw();
+}
 static bool unifiFrame(uint32_t now) { return s_new.tick(now); }
 
 const DisplayMode MODE_UNIFI_OPS = {

@@ -81,6 +81,65 @@ __attribute__((noinline)) static DeserializationError readWhole(HTTPClient &http
                   : deserializeJson(*b.out, http.getStream());
 }
 
+// The answer straight off the socket, a buffer at a time, for json_walk.h.
+// It waits for bytes as readAll() does, whatever pace the parser keeps, and
+// ends at the Content-Length or, without one, when the server closes.
+class SocketSource {
+ public:
+  SocketSource(WiFiClient *c, int length, uint32_t timeout_ms)
+      : c_(c), length_(length), timeout_ms_(timeout_ms) {}
+  int read() {
+    if (pos_ == len_ && !fill()) return -1;
+    return buf_[pos_++];
+  }
+  size_t total() const { return total_; }
+  bool timedOut() const { return timed_out_; }
+
+ private:
+  bool fill() {
+    if (!c_ || (length_ >= 0 && total_ >= (size_t)length_)) return false;
+    const uint32_t start = millis();
+    for (;;) {
+      const int avail = c_->available();
+      if (avail > 0) {
+        size_t want = (size_t)avail < sizeof(buf_) ? (size_t)avail : sizeof(buf_);
+        if (length_ >= 0 && want > (size_t)length_ - total_) want = (size_t)length_ - total_;
+        const int n = c_->read(buf_, want);
+        if (n <= 0) continue;
+        len_ = (size_t)n;
+        pos_ = 0;
+        total_ += len_;
+        return true;
+      }
+      if (!c_->connected()) return false;
+      if (millis() - start >= timeout_ms_) { timed_out_ = true; return false; }
+      delay(1);
+    }
+  }
+  WiFiClient *c_;
+  int         length_;   // -1: until the close
+  uint32_t    timeout_ms_;
+  uint8_t     buf_[512];
+  size_t      len_ = 0, pos_ = 0, total_ = 0;
+  bool        timed_out_ = false;
+};
+
+__attribute__((noinline)) static DeserializationError readStream(HTTPClient &http, const GsHttp &req,
+                                                                const GsBody &b, char *err, size_t err_n) {
+  const int length = http.getSize();
+  SocketSource src(http.getStreamPtr(), length, req.timeout_ms);
+  GsJsonEach each = b.each;
+  void *ctx = b.ctx;
+  const DeserializationError e = jsonWalkArray(src, b.list, *b.filter,
+                                               [each, ctx](JsonObjectConst el) { each(el, ctx); });
+  if (!e) return e;
+  if (src.timedOut())
+    snprintf(err, err_n, "read timeout after %u bytes", (unsigned)src.total());
+  else if (length >= 0 && src.total() < (size_t)length)
+    snprintf(err, err_n, "answer cut off at %u of %d bytes", (unsigned)src.total(), length);
+  return e;
+}
+
 __attribute__((noinline)) static DeserializationError readEach(HTTPClient &http, const GsHttp &req,
                                                               const GsBody &b, char *err, size_t err_n) {
   BodyBlocks blocks(GS_HTTP_WALK_MAX);
@@ -140,7 +199,9 @@ static int request(const GsHttp &req, const GsBody &b, char *err, size_t err_n, 
     http.end();
     return -5;
   }
-  const DeserializationError e = b.walk ? readEach(http, req, b, err, err_n) : readWhole(http, req, b, err, err_n);
+  const DeserializationError e = !b.walk      ? readWhole(http, req, b, err, err_n)
+                               : req.stream ? readStream(http, req, b, err, err_n)
+                                            : readEach(http, req, b, err, err_n);
   http.end();
   if (!e) return code;
   if (err[0]) return -3;   // too big, cut off or too slow: the reader said why
