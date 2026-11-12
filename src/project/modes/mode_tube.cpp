@@ -90,7 +90,7 @@ static bool tubeFetch(char *err, size_t err_n) {
   GsHttp req;
   req.url = url;
   s_next = TubeData();
-  if (gsHttpJsonEach(req, nullptr, filter, consider, &s_next, err, err_n) < 0) {
+  if (!gsHttpOk(gsHttpJsonEach(req, nullptr, filter, consider, &s_next, err, err_n))) {
     if (!err[0]) snprintf(err, err_n, "unexpected answer");
     return false;
   }

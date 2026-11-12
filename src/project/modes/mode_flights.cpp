@@ -70,7 +70,7 @@ static const Route *routeFor(const char *callsign) {
   GsHttp req;
   req.url = url;
   req.buffer_max = GS_HTTP_BUFFER_MAX;
-  if (gsHttpJson(req, doc, &filter, err, sizeof(err)) >= 200) {
+  if (gsHttpOk(gsHttpJson(req, doc, &filter, err, sizeof(err)))) {
     JsonObjectConst route = doc["response"]["flightroute"];
     if (!route.isNull()) {
       auto code = [](JsonObjectConst a) {
@@ -99,10 +99,11 @@ static void trimRight(char *s) {
 struct AdsbFeed {
   const char *url_fmt;   // latitude, longitude, radius in nautical miles
   const char *list;      // the key of the aircraft array
+  bool        http11;    // refuses HTTP/1.0 (gs_http.h)
 };
 static const AdsbFeed FEEDS[] = {
-  { "https://api.adsb.lol/v2/point/%.4f/%.4f/%d",              "ac" },
-  { "https://opendata.adsb.fi/api/v2/lat/%.4f/lon/%.4f/dist/%d", "aircraft" },
+  { "https://api.adsb.lol/v2/point/%.4f/%.4f/%d",              "ac",       true  },
+  { "https://opendata.adsb.fi/api/v2/lat/%.4f/lon/%.4f/dist/%d", "aircraft", false },
 };
 static const size_t FEED_N = sizeof(FEEDS) / sizeof(FEEDS[0]);
 static size_t s_feed = 0;   // the fetch task's alone
@@ -149,8 +150,9 @@ static bool askFeed(const AdsbFeed &feed, float lat, float lon, Nearest &n,
   filter["dst"] = true;
   GsHttp req;
   req.url = url;
+  req.http11 = feed.http11;
   n = Nearest();
-  return gsHttpJsonEach(req, feed.list, filter, consider, &n, err, err_n) >= 0;
+  return gsHttpOk(gsHttpJsonEach(req, feed.list, filter, consider, &n, err, err_n));
 }
 
 static bool flightsFetch(char *err, size_t err_n) {

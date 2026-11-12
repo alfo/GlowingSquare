@@ -33,6 +33,8 @@ static std::string slurp(const std::string &path) {
 static std::string g_last_url;
 static std::vector<std::string> g_urls;   // every request, in order
 static const char *g_down = nullptr;      // a host that refuses, as on the device
+static int g_down_code = -1;              // its answer: a refusal, or an HTTP status
+static std::vector<bool> g_http11;        // per request: asked over HTTP/1.1
 
 // The fixture for a URL, or "" with err set: the refusal of a host that is
 // down, or no fixture at all.
@@ -40,8 +42,9 @@ static std::string answerFor(const char *url, int &code, char *err, size_t n) {
   g_last_url = url;
   g_urls.push_back(url);
   if (g_down && strstr(url, g_down)) {
-    snprintf(err, n, "connection refused");
-    code = -1;
+    if (g_down_code < 0) snprintf(err, n, "connection refused");
+    else                 snprintf(err, n, "HTTP %d", g_down_code);
+    code = g_down_code;
     return "";
   }
   static const struct { const char *part, *file; } MAP[] = {
@@ -85,6 +88,7 @@ struct StringSource {
 
 int gsHttpJsonEach(const GsHttp &req, const char *list, const JsonDocument &filter,
                    GsJsonEach each, void *ctx, char *err, size_t n) {
+  g_http11.push_back(req.http11);
   int code;
   const std::string body = answerFor(req.url, code, err, n);
   if (code != 200) return code;
@@ -257,6 +261,26 @@ int main(int argc, char **argv) {
   fetchCommit(MODE_FLIGHTS_OPS);
   assert(g_urls[0].find("opendata.adsb.fi") != std::string::npos);
   g_down = nullptr;
+
+  // adsb.lol up but refusing HTTP/1.0 ("426 Upgrade Required", 12.11.2026):
+  // an error status is a failed feed, not a clear sky, so adsb.fi answers.
+  // adsb.lol itself is asked over HTTP/1.1, adsb.fi over 1.0.
+  g_down = "opendata.adsb.fi";                         // adsb.fi down: adsb.lol next
+  g_urls.clear();
+  g_http11.clear();
+  fetchCommit(MODE_FLIGHTS_OPS);
+  assert(g_urls.size() >= 2 && g_urls[1].find("api.adsb.lol") != std::string::npos);
+  assert(!g_http11[0] && g_http11[1]);
+  g_down = "api.adsb.lol";                             // and now adsb.lol says 426
+  g_down_code = 426;
+  matrixCanvas().fillScreen(0);
+  g_urls.clear();
+  fetchCommit(MODE_FLIGHTS_OPS);
+  assert(g_urls.size() >= 2 && g_urls[0].find("api.adsb.lol") != std::string::npos);
+  assert(g_urls[1].find("opendata.adsb.fi") != std::string::npos);
+  assert(rowHasColour(0, rgb565(0, 255, 255)));        // a flight, not a dark panel
+  g_down = nullptr;
+  g_down_code = -1;
 
   // ---- Unifi ----
   snprintf(g_unifi_url, sizeof g_unifi_url, "https://192.168.1.1");

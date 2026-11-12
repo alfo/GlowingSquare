@@ -96,8 +96,8 @@ static int sendRequest(HTTPClient &http, const GsHttp &req) {
   http.addHeader("User-Agent", APP_USER_AGENT);
   http.addHeader("Accept", "application/json");
   for (int i = 0; i + 1 < 8 && req.headers[i]; i += 2) http.addHeader(req.headers[i], req.headers[i + 1]);
-  static const char *KEYS[] = { "Set-Cookie", "X-CSRF-Token" };
-  if (req.set_cookie || req.csrf) http.collectHeaders(KEYS, 2);
+  static const char *KEYS[] = { "Set-Cookie", "X-CSRF-Token", "Transfer-Encoding" };
+  http.collectHeaders(KEYS, sizeof(KEYS) / sizeof(KEYS[0]));
   int code;
   if (req.body) {
     http.addHeader("Content-Type", "application/json");
@@ -119,7 +119,9 @@ static int request(const GsHttp &req, const GsBody &b, char *err, size_t err_n, 
   }
   HTTPClient http;
   // HTTP/1.0: no chunked transfer, so the body can be read straight off.
-  http.useHTTP10(true);
+  // HTTP/1.1 where the server insists, closed after the one answer.
+  http.useHTTP10(!req.http11);
+  if (req.http11) http.setReuse(false);
   http.setConnectTimeout(req.timeout_ms);
   http.setTimeout(req.timeout_ms);
   if (!http.begin(tls ? (WiFiClient &)secure : plain, req.url)) {
@@ -132,6 +134,11 @@ static int request(const GsHttp &req, const GsBody &b, char *err, size_t err_n, 
     else          snprintf(err, err_n, "HTTP %d", code);
     http.end();
     return code;
+  }
+  if (http.header("Transfer-Encoding").indexOf("chunked") >= 0) {
+    snprintf(err, err_n, "chunked answer, not read");
+    http.end();
+    return -5;
   }
   const DeserializationError e = b.walk ? readEach(http, req, b, err, err_n) : readWhole(http, req, b, err, err_n);
   http.end();

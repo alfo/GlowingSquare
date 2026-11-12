@@ -23,6 +23,10 @@ struct GsHttp {
   // answers too big to hold (UniFi's client list).
   size_t       buffer_max = 0;
   uint32_t     timeout_ms = 8000;
+  // HTTP/1.1, for a server that refuses 1.0 (adsb.lol, "426 Upgrade
+  // Required", since 12.11.2026). Asked with Connection: close and read to
+  // the Content-Length; an answer sent chunked is reported, not parsed.
+  bool         http11 = false;
   // Filled when given: the Set-Cookie and X-CSRF-Token answers (UniFi login).
   String      *set_cookie = nullptr;
   String      *csrf       = nullptr;
@@ -30,6 +34,12 @@ struct GsHttp {
 
 // The HTTP status, or a negative HTTPClient error. `err` gets a line for the
 // log whenever the answer is not a 2xx parsed cleanly.
+//
+// Test with gsHttpOk(): an error status (404, 426, 503) is positive too, and
+// read as ">= 0" it passed for an answer with nothing in it. Flights showed a
+// clear sky for as long as adsb.lol answered 426, and never asked adsb.fi.
+static inline bool gsHttpOk(int code) { return code >= 200 && code < 300; }
+
 int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
                char *err, size_t err_n);
 

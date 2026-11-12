@@ -103,7 +103,7 @@ static bool login(char *err, size_t err_n) {
   req.verify_tls = g_unifi_verify_tls;
   req.set_cookie = &cookie;
   req.csrf = &csrf;
-  if (gsHttpJson(req, doc, &filter, err, err_n) < 0 || !cookie.length()) {
+  if (!gsHttpOk(gsHttpJson(req, doc, &filter, err, err_n)) || !cookie.length()) {
     snprintf(err, err_n, "%s", err[0] ? err : "login refused");
     return false;
   }
@@ -155,7 +155,7 @@ static bool readClients(char *err, size_t err_n) {
   f["name"] = true;
   f["uptime"] = true;
   f["is_guest"] = true;
-  if (api("stat/sta", nullptr, filter, doc, err, err_n) < 200) return false;
+  if (!gsHttpOk(api("stat/sta", nullptr, filter, doc, err, err_n))) return false;
   for (JsonObjectConst c : doc["data"].as<JsonArrayConst>()) {
     if (c["is_guest"] | false) s_next.guests++;
     else                       s_next.clients++;
@@ -179,7 +179,7 @@ static bool readGraph(char *err, size_t err_n) {
            (unsigned long long)now_ms);
   JsonDocument filter, doc;
   filter["data"][0]["wan-rx_bytes"] = true;
-  if (api("stat/report/5minutes.site", body, filter, doc, err, err_n) < 200) return false;
+  if (!gsHttpOk(api("stat/report/5minutes.site", body, filter, doc, err, err_n))) return false;
 
   JsonArrayConst data = doc["data"].as<JsonArrayConst>();
   const int n = (int)data.size();
@@ -209,7 +209,7 @@ static bool readMonth(char *err, size_t err_n) {
   JsonDocument filter, doc;
   filter["data"][0]["wan-rx_bytes"] = true;
   filter["data"][0]["wan-tx_bytes"] = true;
-  if (api("stat/report/daily.site", body, filter, doc, err, err_n) < 200) return false;
+  if (!gsHttpOk(api("stat/report/daily.site", body, filter, doc, err, err_n))) return false;
   double rx = 0, tx = 0;
   for (JsonObjectConst d : doc["data"].as<JsonArrayConst>()) {
     rx += d["wan-rx_bytes"] | 0.0;
