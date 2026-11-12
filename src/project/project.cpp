@@ -262,10 +262,16 @@ static String statusCard() {
   h += row(STR_P_CARD_LAST, "last", lastUpdate());
   h += row(STR_P_CARD_MQTT, "mqtt", mqttText());
   h += F("</div>");
+  // The two controls, each under its own label: side by side and bare, under
+  // the MQTT row, they read as MQTT's.
   if (webGateOpen(GATE_CONFIG)) {
-    h += F("<div class='inrow' style='margin-top:14px'><input type='range' id='gsb' min='0' max='255' value='");
+    h += F("<div class='field' style='margin-top:16px'><label for='gsb'>");
+    h += T(STR_P_CARD_BRIGHT);
+    h += F("</label><input type='range' id='gsb' min='0' max='255' value='");
     h += String(g_brightness_target);
-    h += F("'><select id='gsp'>");
+    h += F("'></div><div class='field'><label for='gsp'>");
+    h += T(STR_P_CARD_PARTY);
+    h += F("</label><select id='gsp'>");
     for (uint8_t p = 0; p < 3; p++) {
       h += F("<option value='");
       h += String(p);
