@@ -1,0 +1,7 @@
+{
+  "name": "PxMatrix",
+  "version": "1.8.2-gs1",
+  "description": "PxMatrix 1.8.2 by Dominic Buchstaller (2dom/PxMatrix, BSD), vendored with the changes Arduino core 3 / ESP-IDF 5 needs. See README.md.",
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}

@@ -1,0 +1,228 @@
+#include "time_service.h"
+
+#include <sys/time.h>
+#include <time.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "app_config.h"
+#include "services/prefs_store.h"
+
+// A short list rather than every zone there is: these cover where the device
+// actually gets used. The value is the POSIX string the C library wants,
+// rules included, so daylight saving is handled rather than assumed. A zone
+// without daylight saving gets its own row even where one with the same
+// offset exists: Queensland on "Australia Eastern" would run an hour ahead
+// for half the year. Only UTC and CET are addressed by index (below); the
+// preference stores the string, so rows may go anywhere else.
+const TimeZoneEntry TZ_LIST[] = {
+  { "UTC",                   "UTC0",                            "UTC+0"            },
+  { "Europe (CET/CEST)",     "CET-1CEST,M3.5.0,M10.5.0/3",      "UTC+1 / +2"       },
+  { "Europe (UK)",           "GMT0BST,M3.5.0/1,M10.5.0",        "UTC+0 / +1"       },
+  { "Europe (EET/EEST)",     "EET-2EEST,M3.5.0/3,M10.5.0/4",    "UTC+2 / +3"       },
+  { "Turkey / Moscow",       "<+03>-3",                         "UTC+3"            },
+  { "South Africa",          "SAST-2",                          "UTC+2"            },
+  { "West Africa",           "WAT-1",                           "UTC+1"            },
+  { "Canada Atlantic",       "AST4ADT,M3.2.0,M11.1.0",          "UTC-4 / -3"       },
+  { "US Eastern",            "EST5EDT,M3.2.0,M11.1.0",          "UTC-5 / -4"       },
+  { "US Central",            "CST6CDT,M3.2.0,M11.1.0",          "UTC-6 / -5"       },
+  { "Mexico City",           "CST6",                            "UTC-6"            },
+  { "US Mountain",           "MST7MDT,M3.2.0,M11.1.0",          "UTC-7 / -6"       },
+  { "US Arizona",            "MST7",                            "UTC-7"            },
+  { "US Pacific",            "PST8PDT,M3.2.0,M11.1.0",          "UTC-8 / -7"       },
+  { "US Alaska",             "AKST9AKDT,M3.2.0,M11.1.0",        "UTC-9 / -8"       },
+  { "US Hawaii",             "HST10",                           "UTC-10"           },
+  { "New Zealand",           "NZST-12NZDT,M9.5.0,M4.1.0/3",     "UTC+12 / +13"     },
+  { "Australia Eastern",     "AEST-10AEDT,M10.1.0,M4.1.0/3",    "UTC+10 / +11"     },
+  { "Australia Queensland",  "AEST-10",                         "UTC+10"           },
+  { "Australia Central",     "ACST-9:30ACDT,M10.1.0,M4.1.0/3",  "UTC+9:30 / +10:30"},
+  { "Japan",                 "JST-9",                           "UTC+9"            },
+  { "Singapore",             "<+08>-8",                         "UTC+8"            },
+  { "Thailand / Vietnam",    "<+07>-7",                         "UTC+7"            },
+  { "India",                 "IST-5:30",                        "UTC+5:30"         },
+  { "Gulf (Dubai)",          "<+04>-4",                         "UTC+4"            },
+  { "Brazil (Sao Paulo)",    "<-03>3",                          "UTC-3"            },
+};
+const size_t TZ_COUNT = sizeof(TZ_LIST) / sizeof(TZ_LIST[0]);
+
+#define TZ_INDEX_CET  1
+#define TZ_INDEX_UTC  0
+
+#define PREF_KEY_TZ    "tz"
+
+// The zone a device starts in until someone picks one: APP_DEFAULT_TZ from
+// project_config.h (a POSIX TZ string), UTC when the project names none.
+// Languages no longer pick a zone: English is spoken in a dozen of them.
+#ifndef APP_DEFAULT_TZ
+#define APP_DEFAULT_TZ "UTC0"
+#endif
+
+int timeZoneDefaultIndexForLang(uint8_t lang) {
+  (void)lang;
+  for (size_t i = 0; i < TZ_COUNT; i++)
+    if (strcmp(TZ_LIST[i].tz, APP_DEFAULT_TZ) == 0) return (int)i;
+  return TZ_INDEX_UTC;
+}
+
+String timeZoneGet() {
+  const String stored = prefsGetString(PREF_KEY_TZ, "");
+  if (stored.length()) return stored;
+  return String(APP_DEFAULT_TZ);
+}
+
+void timeZoneApply() {
+  const String tz = timeZoneGet();
+  setenv("TZ", tz.c_str(), 1);
+  tzset();
+}
+
+void timeZoneSet(const char *tz) {
+  prefsPutString(PREF_KEY_TZ, tz ? tz : "");
+  timeZoneApply();
+}
+
+int timeZoneIndex() {
+  const String tz = timeZoneGet();
+  for (size_t i = 0; i < TZ_COUNT; i++) {
+    if (tz == TZ_LIST[i].tz) return (int)i;
+  }
+  return -1;
+}
+
+const char* timeZoneName() {
+  const int i = timeZoneIndex();
+  if (i >= 0) return TZ_LIST[i].name;
+  // Not one of ours. Showing the raw string beats showing nothing, and it is
+  // the only way a hand-set zone stays readable.
+  static String raw;
+  raw = timeZoneGet();
+  return raw.c_str();
+}
+
+// How long syncNTP() waits for the first answer before it lets boot go on:
+// 30 polls of 100 ms, three seconds. See the comment in syncNTP().
+#define NTP_BOOT_WAIT_POLL_MS 100
+#define NTP_BOOT_WAIT_POLLS   30
+
+void syncNTP() {
+  // configTime() takes an offset in seconds and a daylight offset, and builds
+  // a TZ string with no switching rules from them - "UTC-1DST" for the
+  // +1/+1 this used to pass. Without rules the C library falls back to its
+  // own default, which is the US calendar, so a central European device
+  // changed over three weeks early in spring and a week late in autumn.
+  //
+  // configTzTime() takes the POSIX string as it is, rules included.
+  const String tz = timeZoneGet();
+  configTzTime(tz.c_str(), "pool.ntp.org", "time.nist.gov");
+  Serial.printf("NTP sync (TZ=%s)...", tz.c_str());
+  // A short wait, then SNTP carries on in the background and sets the clock
+  // whenever an answer comes. It used to be twenty passes of getLocalTime()
+  // with its default timeout, which waits five seconds by itself while the
+  // clock is unset: 110 s of boot on a network that lets no NTP out, with
+  // WiFi up since second 7 and the screen still saying "connecting"
+  // (10.11.2026). On a network that answers, the first reply comes well
+  // inside these three seconds.
+  struct tm ti;
+  for (int i = 0; i < NTP_BOOT_WAIT_POLLS; i++) {
+    delay(NTP_BOOT_WAIT_POLL_MS);
+    if (getLocalTime(&ti, 0)) {
+      Serial.printf("OK! %02d.%02d.%04d %02d:%02d\n", ti.tm_mday, ti.tm_mon + 1,
+        ti.tm_year + 1900, ti.tm_hour, ti.tm_min);
+      return;
+    }
+    Serial.print(".");
+  }
+  Serial.println("NTP ERROR");
+}
+
+// Days from the civil calendar to the epoch, without touching the C library's
+// timezone state - timegm() is not available here and mktime() would read the
+// string as local time, which is the very thing being converted from.
+static time_t utcToEpoch(int y, int mo, int d, int h, int mi, int s) {
+  y -= (mo <= 2);
+  int era = (y >= 0 ? y : y - 399) / 400;
+  unsigned yoe = (unsigned)(y - era * 400);
+  unsigned doy = (153u * (unsigned)(mo + (mo > 2 ? -3 : 9)) + 2u) / 5u + (unsigned)d - 1u;
+  unsigned doe = yoe * 365u + yoe / 4u - yoe / 100u + doy;
+  long long days = (long long)era * 146097LL + (long long)doe - 719468LL;
+  return (time_t)(days * 86400LL + h * 3600LL + mi * 60LL + s);
+}
+
+bool timeClockSet() {
+  const time_t now = time(nullptr);
+  struct tm t;
+  localtime_r(&now, &t);
+  return t.tm_year + 1900 >= 2024;
+}
+
+bool timeSetFromHttpDate(const char* date) {
+  if (timeClockSet() || !date || !*date) return false;
+  // RFC 9110 IMF-fixdate, the only form a server may send:
+  // "Tue, 10 Nov 2026 18:49:48 GMT".
+  static const char* const MONTHS = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  char mon[4] = "";
+  int d, y, h, mi, s;
+  if (sscanf(date, "%*3s, %2d %3s %4d %2d:%2d:%2d", &d, mon, &y, &h, &mi, &s) != 6) return false;
+  const char* m = (strlen(mon) == 3) ? strstr(MONTHS, mon) : nullptr;
+  if (!m || (m - MONTHS) % 3 != 0) return false;
+  if (y < 2024 || d < 1 || d > 31 || h > 23 || mi > 59 || s > 60) return false;
+  struct timeval tv = {};
+  tv.tv_sec = utcToEpoch(y, (int)((m - MONTHS) / 3) + 1, d, h, mi, s);
+  return settimeofday(&tv, nullptr) == 0;
+}
+
+void isoDayLocal(const char* iso, char* out_day, size_t out_size) {
+  if (!iso || !out_day || out_size == 0) return;
+  int y, mo, d, h, mi, s;
+  if (strchr(iso, 'Z') &&
+      sscanf(iso, "%4d-%2d-%2dT%2d:%2d:%2d", &y, &mo, &d, &h, &mi, &s) == 6) {
+    time_t stamp = utcToEpoch(y, mo, d, h, mi, s);
+    struct tm* local = localtime(&stamp);
+    if (local) {
+      snprintf(out_day, out_size, "%04d-%02d-%02d",
+               local->tm_year + 1900, local->tm_mon + 1, local->tm_mday);
+      return;
+    }
+  }
+  strncpy(out_day, iso, out_size - 1);
+  out_day[out_size - 1] = '\0';
+  if (strlen(out_day) > 10) out_day[10] = '\0';
+}
+
+bool dayLocalNoonUtc(const char* day, char* out, size_t out_size) {
+  if (!day || !out || out_size == 0) return false;
+  int y, mo, d;
+  if (sscanf(day, "%4d-%2d-%2d", &y, &mo, &d) != 3) return false;
+  struct tm local = {};
+  local.tm_year  = y - 1900;
+  local.tm_mon   = mo - 1;
+  local.tm_mday  = d;
+  local.tm_hour  = 12;
+  local.tm_isdst = -1;   // let mktime() decide, see daysSince()
+  const time_t stamp = mktime(&local);
+  struct tm* utc = gmtime(&stamp);
+  if (stamp < 0 || !utc) return false;
+  snprintf(out, out_size, "%04d-%02d-%02dT%02d:%02d:%02d.000Z",
+           utc->tm_year + 1900, utc->tm_mon + 1, utc->tm_mday,
+           utc->tm_hour, utc->tm_min, utc->tm_sec);
+  return true;
+}
+
+bool nowIsoUtc(char* out, size_t out_size) {
+  if (!out || out_size == 0) return false;
+  snprintf(out, out_size, "2026-01-01T00:00:00.000Z");
+
+  // Timeout 0: the default is five seconds of polling when the year still
+  // reads 1970, and this is called from the pad's drying button, which is an
+  // LVGL callback. A clock that is not set now is not going to be set in five
+  // seconds either.
+  struct tm ti;
+  if (!getLocalTime(&ti, 0)) return false;
+  time_t now = mktime(&ti);
+  struct tm* utc = gmtime(&now);
+  if (!utc) return false;
+  snprintf(out, out_size, "%04d-%02d-%02dT%02d:%02d:%02d.000Z",
+           utc->tm_year + 1900, utc->tm_mon + 1, utc->tm_mday,
+           utc->tm_hour, utc->tm_min, utc->tm_sec);
+  return true;
+}

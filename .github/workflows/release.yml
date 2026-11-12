@@ -1,0 +1,117 @@
+name: Release
+
+# A tag vX.Y.Z (public) or vX.Y.Z-beta.N (test build) that matches FW_VERSION
+# in src/project/project_config.h. Builds every env, attaches
+# <slug>-<env>.bin per env to a GitHub release, and publishes the web
+# flasher and version.json on the gh-pages branch, which GitHub Pages serves.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.envs.outputs.envs }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must equal FW_VERSION
+        id: version
+        run: |
+          VERSION=$(sed -nE 's/^#define[[:space:]]+FW_VERSION[[:space:]]+"([^"]+)".*/\1/p' src/project/project_config.h)
+          if [ "$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match FW_VERSION $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Tag must rank above what is published
+        run: |
+          # Every device compares itself against version.json; a tag ranking
+          # below the published one would offer every device a downgrade.
+          # The ranking must stay identical to src/services/version_compare.cpp.
+          git fetch --depth=1 origin gh-pages 2>/dev/null && git show origin/gh-pages:version.json > /tmp/version.json 2>/dev/null || echo '{}' > /tmp/version.json
+          python3 - "$GITHUB_REF_NAME" <<'PY'
+          import json, re, sys
+          def rank(v):
+              m = re.search(r"(\d+)\.(\d+)\.(\d+)", v or "")
+              if not m: return -1
+              a, b, c = (int(g) for g in m.groups())
+              beta = 999
+              i = v.find("beta")
+              if i != -1:
+                  m2 = re.match(r"\.(\d+)", v[i + 4:])
+                  beta = int(m2.group(1)) if m2 else 0
+              return a * 10**9 + b * 10**6 + c * 10**3 + beta
+          tag = sys.argv[1]
+          data = json.load(open("/tmp/version.json"))
+          seen = [data.get("stable"), data.get("prerelease")]
+          for e in (data.get("envs") or {}).values():
+              seen += [e.get("stable"), e.get("prerelease")]
+          top = max((s for s in seen if s), key=rank, default="")
+          if top and rank(tag) <= rank(top):
+              sys.exit(f"::error::{tag} does not rank above the published {top}")
+          print(f"{tag} ranks above '{top or 'nothing'}'")
+          PY
+      - id: envs
+        run: echo "envs=$(python3 scripts/pio_envs.py --matrix)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: ${{ fromJSON(needs.prepare.outputs.envs) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-pio
+      - run: pio run -e ${{ matrix.env }}
+      - run: python3 scripts/size_gate.py ${{ matrix.env }}
+      - name: Collect
+        run: |
+          mkdir -p dist/${{ matrix.env }}
+          cp .pio/build/${{ matrix.env }}/{firmware,bootloader,partitions}.bin dist/${{ matrix.env }}/
+          # otadata, blank: boots app0 after a flash. Without it a device that
+          # last ran from app1 keeps booting the old firmware from there.
+          cp "$(find ~/.platformio/packages -path '*framework-arduinoespressif32*' -name boot_app0.bin | head -1)" dist/${{ matrix.env }}/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.env }}
+          path: dist
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - name: Check out gh-pages
+        run: |
+          git fetch origin gh-pages && git worktree add pages origin/gh-pages || {
+            git worktree add --detach pages
+            (cd pages && git checkout --orphan gh-pages && git rm -rfq .)
+          }
+      - name: Assemble
+        run: python3 scripts/release_assemble.py --version "${{ needs.prepare.outputs.version }}" --dist dist --pages pages --assets assets
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ needs.prepare.outputs.version }}
+          prerelease: ${{ contains(github.ref_name, '-beta.') }}
+          generate_release_notes: true
+          files: assets/*.bin
+      - name: Publish gh-pages
+        run: |
+          cd pages
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish ${{ needs.prepare.outputs.version }}" || exit 0
+          git push origin HEAD:gh-pages

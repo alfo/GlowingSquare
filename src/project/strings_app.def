@@ -1,0 +1,138 @@
+// Glowing Square's strings. S(ID, "English"). Ids start with STR_P_ so they
+// never collide with the core's.
+
+// ---- Sections ----
+S(STR_P_SEC_DISPLAY,      "Display")
+S(STR_P_SEC_DISPLAY_INFO, "What the matrix shows. Each mode keeps the layout it had on its own display.")
+S(STR_P_SEC_TUBE,         "Tube / London Bus")
+S(STR_P_SEC_TUBE_INFO,    "Departures from one stop, from TfL. Tube and bus stops work the same way.")
+S(STR_P_SEC_FLIGHTS,      "Flights")
+S(STR_P_SEC_FLIGHTS_INFO, "The nearest aircraft overhead, from adsb.lol or adsb.fi, with its route from adsbdb.com.")
+S(STR_P_SEC_UNIFI,        "Unifi")
+S(STR_P_SEC_UNIFI_INFO,   "Network statistics, read straight from your UniFi console. No helper server needed any more.")
+S(STR_P_SEC_MQTT,         "MQTT")
+S(STR_P_SEC_MQTT_INFO,    "Brightness and party mode from your MQTT broker, on the same topics as v1, plus Home Assistant discovery.")
+S(STR_P_SEC_PINS,         "HUB75 pins")
+S(STR_P_SEC_PINS_INFO,    "Which GPIO drives each panel line. Takes effect after a restart.")
+
+S(STR_P_SEC_PANEL,      "Panel")
+S(STR_P_SEC_PANEL_INFO, "How PxMatrix drives the panel. If the power supply whines, try a shorter refresh period; changes apply at once.")
+
+// ---- Display ----
+S(STR_P_MODE,             "Mode")
+S(STR_P_MODE_TUBE,        "Tube / Bus departures")
+S(STR_P_MODE_FLIGHTS,     "Flights overhead")
+S(STR_P_MODE_UNIFI,       "Unifi network")
+S(STR_P_BOOT_BRIGHT,      "Brightness at power-on")
+S(STR_P_BOOT_BRIGHT_INFO, "0 to 255. MQTT, Home Assistant and the Status page change it while running.")
+S(STR_P_SCROLL,           "Scroll speed")
+S(STR_P_SCROLL_INFO,      "Milliseconds per pixel: lower is faster. v1 used 40 for the Tube and 50 for Unifi.")
+
+// ---- Tube ----
+S(STR_P_TFL_STOP,         "Stop ID")
+S(STR_P_TFL_STOP_INFO,    "The NaPTAN id of the stop, e.g. 940GZZLUOXC for Oxford Circus. Look it up at api.tfl.gov.uk/StopPoint/Search/<name>.")
+S(STR_P_TFL_LINE,         "Line or route")
+S(STR_P_TFL_LINE_INFO,    "e.g. northern, circle, H91, 9. Empty shows every line at the stop.")
+S(STR_P_TFL_DIR,          "Direction")
+S(STR_P_TFL_DIR_BOTH,     "Both")
+S(STR_P_TFL_DIR_IN,       "Inbound")
+S(STR_P_TFL_DIR_OUT,      "Outbound")
+S(STR_P_TFL_KEY,          "TfL app key")
+S(STR_P_TFL_KEY_INFO,     "Optional. Without one TfL limits requests heavily; a free key from api-portal.tfl.gov.uk allows 500 a minute.")
+S(STR_P_TFL_PLATFORM,     "Show the platform")
+S(STR_P_TFL_RENAME,       "Rename")
+S(STR_P_TFL_RENAME_INFO,  "When TfL names a train wrongly: from=to, several separated by ;. A destination containing from shows as to, e.g. Hammersmith=Circle via Victoria; Check Front of Train=Wimbledon.")
+S(STR_P_TFL_PLAT_FILTER,  "Platform")
+S(STR_P_TFL_PLAT_FILTER_INFO, "Only trains from platforms whose name contains this, e.g. \"Platform 1\" or \"Inner Rail\". Empty shows every platform. More reliable than the direction when TfL leaves it out.")
+
+// ---- Flights ----
+S(STR_P_FL_LAT,           "Latitude")
+S(STR_P_FL_LON,           "Longitude")
+S(STR_P_FL_LATLON_INFO,   "The centre of the area to watch, in decimal degrees. Your house, usually.")
+S(STR_P_FL_RADIUS,        "Radius")
+S(STR_P_FL_MIN_ALT,       "Lowest altitude")
+S(STR_P_FL_MIN_ALT_INFO,  "Aircraft below this are skipped: taxiing, helicopters, the odd drone.")
+
+// ---- Unifi ----
+S(STR_P_UNIFI_URL,        "Console address")
+S(STR_P_UNIFI_URL_INFO,   "e.g. https://192.168.1.1 for a UniFi OS console, https://10.0.1.9:8443 for a classic controller.")
+S(STR_P_UNIFI_SITE,       "Site")
+S(STR_P_UNIFI_AUTH,       "Sign in with")
+S(STR_P_UNIFI_AUTH_KEY,   "API key (UniFi OS)")
+S(STR_P_UNIFI_AUTH_OS,    "User and password (UniFi OS)")
+S(STR_P_UNIFI_AUTH_OLD,   "User and password (classic controller)")
+S(STR_P_UNIFI_KEY,        "API key")
+S(STR_P_UNIFI_KEY_INFO,   "UniFi Network > Settings > Control Plane > Integrations > Create API key.")
+S(STR_P_UNIFI_USER,       "User")
+S(STR_P_UNIFI_USER_INFO,  "A local account, read-only is enough.")
+S(STR_P_UNIFI_PASS,       "Password")
+S(STR_P_UNIFI_TLS,        "Check the certificate")
+S(STR_P_UNIFI_TLS_INFO,   "Leave off for a console with its own self-signed certificate, which is nearly all of them.")
+
+// ---- MQTT ----
+S(STR_P_MQTT_ON,          "Use MQTT")
+S(STR_P_MQTT_HOST,        "Broker")
+S(STR_P_MQTT_PORT,        "Port")
+S(STR_P_MQTT_USER,        "User")
+S(STR_P_MQTT_PASS,        "Password")
+S(STR_P_MQTT_ROOM,        "Room")
+S(STR_P_MQTT_ROOM_INFO,   "The first part of every topic, e.g. living_room. Party mode is read from <room>/state.")
+S(STR_P_MQTT_NAME,        "Device topic")
+S(STR_P_MQTT_NAME_INFO,   "The middle part: <room>/<this>/in. Empty uses glowingsquare/<mode>, as v1 did.")
+S(STR_P_MQTT_HA,          "Home Assistant discovery")
+S(STR_P_MQTT_HA_INFO,     "Announces a light (on/off, brightness) and selects for the mode and party mode.")
+
+// ---- Panel ----
+S(STR_P_PX_PERIOD,      "Refresh period")
+S(STR_P_PX_PERIOD_INFO, "One refresh every this long. v1 used 4000. Shorter moves the whine higher (often out of hearing) and brightens the panel.")
+S(STR_P_PX_ON,          "On-time per row")
+S(STR_P_PX_ON_INFO,     "How long each row is lit per refresh. v1 used 70. Lower is dimmer and draws less current per burst.")
+
+S(STR_P_PX_MUX,         "Row switch settle time")
+S(STR_P_PX_MUX_INFO,    "A wait after setting each row address line. 3 steadied rows 7 and 15 on the original displays. Raise it if a row before an address change flickers; v1 used 0.")
+
+// ---- Pins ----
+S(STR_P_PIN_R1, "R1")
+S(STR_P_PIN_G1, "G1")
+S(STR_P_PIN_B1, "B1")
+S(STR_P_PIN_R2, "R2")
+S(STR_P_PIN_G2, "G2")
+S(STR_P_PIN_B2, "B2")
+S(STR_P_PIN_A,  "A")
+S(STR_P_PIN_B,  "B")
+S(STR_P_PIN_C,  "C")
+S(STR_P_PIN_D,  "D")
+S(STR_P_PIN_E,  "E (64-row panels, -1 for none)")
+S(STR_P_PIN_LAT, "LAT")
+S(STR_P_PIN_OE,  "OE")
+S(STR_P_PIN_CLK, "CLK")
+
+// ---- Status card ----
+S(STR_P_CARD,             "Display")
+S(STR_P_CARD_MODE,        "Showing")
+S(STR_P_CARD_PARTY,       "Party mode")
+S(STR_P_PARTY_OFF,        "Off")
+S(STR_P_PARTY_CHILL,      "Chill")
+S(STR_P_PARTY_ON,         "Party")
+S(STR_P_CARD_BRIGHT,      "Brightness")
+S(STR_P_CARD_LAST,        "Last update")
+S(STR_P_CARD_MQTT,        "MQTT")
+S(STR_P_CARD_PREVIEW,     "Live view")
+S(STR_P_NEVER,            "not yet")
+S(STR_P_MQTT_CONNECTED,   "connected")
+S(STR_P_MQTT_DOWN,        "not connected")
+S(STR_P_MQTT_OFF,         "off")
+
+// ---- Flight area converter (Flights section) ----
+S(STR_P_FL_LOCATE,        "Or let this browser say where it is, once:")
+S(STR_P_FL_LOCATE_BTN,    "Use my location")
+S(STR_P_FL_LOCATE_WAIT,   "Waiting for the location window...")
+S(STR_P_FL_LOCATE_DENIED, "Location was not allowed.")
+S(STR_P_FL_LOCATE_BLOCKED,"The browser blocked the location window. Allow pop-ups for this page and try again.")
+S(STR_P_FL_LOCATE_NONE,   "The browser could not find a location.")
+S(STR_P_FL_CONVERT,       "Coming from v1? Paste its flight area (lat1,lat2,lon1,lon2) to fill in the centre and radius:")
+S(STR_P_FL_CONVERT_BTN,   "Convert")
+
+// ---- Test buttons ----
+S(STR_P_TEST,             "Test now")
+S(STR_P_TESTING,          "Testing ...")

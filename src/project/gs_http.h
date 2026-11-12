@@ -1,0 +1,58 @@
+#pragma once
+
+#include <Arduino.h>
+#include <ArduinoJson.h>
+
+// One HTTP(S) request whose answer is JSON, parsed straight off the socket
+// through an optional filter, so a big answer never has to fit in RAM whole.
+// For the fetch task only: it blocks for as long as the server takes.
+// What a buffered answer may weigh: TfL's whole-stop list is ~20 kB, a busy
+// sky over London ~10 kB. Leaves room for TLS on a board without PSRAM.
+#define GS_HTTP_BUFFER_MAX  (40u * 1024u)
+
+struct GsHttp {
+  const char  *url;
+  const char  *method  = "GET";
+  const char  *body    = nullptr;      // sent as application/json
+  const char  *headers[8] = {nullptr}; // name, value, name, value ...
+  bool         verify_tls = true;      // false: any certificate (self-signed consoles)
+  // Read the whole body before parsing, up to this many bytes; 0 parses
+  // straight off the socket. Reading first survives a server that ends the
+  // body by closing the connection (TfL: no Content-Length), where parsing
+  // off the TLS socket sometimes lost the last bytes. Streaming is for
+  // answers too big to hold (UniFi's client list).
+  size_t       buffer_max = 0;
+  uint32_t     timeout_ms = 8000;
+  // HTTP/1.1, for a server that refuses 1.0 (adsb.lol, "426 Upgrade
+  // Required", since 12.11.2026). Asked with Connection: close and read to
+  // the Content-Length; an answer sent chunked is reported, not parsed.
+  bool         http11 = false;
+  // gsHttpJsonEach only: walk the answer straight off the socket instead of
+  // reading it whole first, for an answer bigger than RAM (UniFi's client
+  // list, some 2 kB a client: v1 needed a PHP server for it). Only a 512-byte
+  // buffer and one element are ever held.
+  bool         stream = false;
+  // Filled when given: the Set-Cookie and X-CSRF-Token answers (UniFi login).
+  String      *set_cookie = nullptr;
+  String      *csrf       = nullptr;
+};
+
+// The HTTP status, or a negative HTTPClient error. `err` gets a line for the
+// log whenever the answer is not a 2xx parsed cleanly.
+//
+// Test with gsHttpOk(): an error status (404, 426, 503) is positive too, and
+// read as ">= 0" it passed for an answer with nothing in it. Flights showed a
+// clear sky for as long as adsb.lol answered 426, and never asked adsb.fi.
+static inline bool gsHttpOk(int code) { return code >= 200 && code < 300; }
+
+int gsHttpJson(const GsHttp &req, JsonDocument &out, const JsonDocument *filter,
+               char *err, size_t err_n);
+
+// The same request, for an answer whose bulk is one array under `list`, or
+// is that array with list nullptr (project/json_walk.h): each element is parsed through `filter` on its own
+// and handed to `each(el, ctx)`, so the array never has to fit in RAM. Read
+// to the last byte even when the server ends the body by closing.
+// buffer_max is ignored.
+typedef void (*GsJsonEach)(JsonObjectConst el, void *ctx);
+int gsHttpJsonEach(const GsHttp &req, const char *list, const JsonDocument &filter,
+                   GsJsonEach each, void *ctx, char *err, size_t err_n);

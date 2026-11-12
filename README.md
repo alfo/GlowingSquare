@@ -1,86 +1,165 @@
 # Glowing Square
 
-This project is a purpose-built display based on a 64x32 LED matrix and an ESP32. The code can be easily adapted for other purposes, and includes code to fetch web requests, store config, etc.
+A purpose-built display: a 64×32 LED matrix and an ESP32 in a wooden frame,
+showing one of three things:
 
-I have made three displays so far: one that shows the current London Tube departures for my local station with data from TfL, one that shows planes flying over my house with data from Flightradar24 based on [this project](https://github.com/GroundBreakingItem0/esp8266_plane_tracker), and one that shows network statistics for my Unifi-based home network.
+- **Tube / London Bus**: the next departures from your stop, from TfL.
+- **Flights**: the plane overhead right now, with its airline's logo, route,
+  altitude and speed.
+- **Unifi**: your home network: monthly traffic, clients and guests, new
+  arrivals, and a graph of the last five hours.
 
 ![Photo](https://i.imgur.com/ZX31npw.jpg)
 
 Full photo album [here](https://imgur.com/a/xTvUx8F).
 
-## Features
+| Tube | Flights | Unifi |
+|---|---|---|
+| ![Tube](docs/previews/tube_settled.png) | ![Flights](docs/previews/flights.png) | ![Unifi](docs/previews/unifi_start.png) |
 
-* Fetches JSON data from an API at a given interval
-* Parses the JSON and displays it
-* Brightness controlled by MQTT
-* "Party Mode" / Screensaver mode, turned on and off by MQTT
-* WiFiManager-based hotspot for configuration
+<sub>Rendered by `test/test_render.py` from real TfL and adsb.lol answers.</sub>
 
-## Hardware Required
-* 64x32 P4 LED Matrix (from [here](https://www.aliexpress.com/store/group/P4-led-module/1848738_509034839.html?spm=a2g0o.detail.0.0.65cc64c7oVbRJF))
-* D1 Mini 32 (any of [these](https://www.aliexpress.com/wholesale?catId=0&initiative_id=SB_20200704011236&SearchText=mini+esp32))
-* Optional: Brian Lough's Shield PCB (you can wire it yourself instead, but these are much neater) (from [here](https://www.tindie.com/products/brianlough/esp32-matrix-shield-mini-32/))
-* 24V PSU (up to 35W per display) (I picked [this one](https://www.ebay.co.uk/itm/DC-5V-12V-24V-Universal-Regulated-Switching-Power-Supply-for-LED-Strip-CCTV-UK/162562112782) for 3 displays) 
-* LM2596 Buck Converter to step down to 5V (from [here](https://www.aliexpress.com/wholesale?catId=0&initiative_id=SB_20200704011644&SearchText=LM2596))
-* Two-core cable, Wago connectors/screw connectors, etc.
-* 6x M3 12mm bolts, 16x 3mm short countersunk screws
+**Glowing Square 2** is one firmware for all three: you pick the mode in the
+web interface, and each mode keeps the layout it had as its own sketch in 2020.
+The v1 sketches are kept under the [`v1-legacy`](../../tree/v1-legacy) tag.
 
-You can just use a 5V power supply instead, but 100W+ ones tend to have loud fans in them, which is annoying, whereas my 24V 120W PSU is completely silent. It also helps with voltage drop if you're using long cables.
+## What's new in 2
+
+- **One firmware, mode chosen in the browser.** No recompiling for a different
+  display.
+- **Web interface.** A status page with a live view of the matrix, a Settings
+  page for every option, firmware updates, logs, and a password if you want one.
+- **Install from the browser.** The [web flasher](https://alfo.github.io/GlowingSquare/)
+  flashes the firmware over USB and hands the device your WiFi. After that,
+  updates arrive over the air from GitHub Releases.
+- **No more PHP.** Unifi mode talks to your console directly, with an API key.
+- **Flights from open data.** [adsb.lol](https://adsb.lol), with
+  [adsb.fi](https://adsb.fi) when it is down, and
+  [adsbdb](https://www.adsbdb.com) replace the unofficial Flightradar24 feed.
+- **Home Assistant.** MQTT discovery adds a light (on/off, brightness) and
+  selects for the mode and party mode. v1's topics still work.
+- **Smooth.** Scrolling text no longer freezes everything else; the device
+  answers the web, MQTT and the network while it scrolls.
+
+## Hardware
+
+* 64×32 P4 LED matrix (HUB75)
+* An ESP32: the original builds use a **D1 Mini 32** on **Brian Lough's ESP32
+  Matrix Shield (Mini 32)**
+* 24V PSU (up to 35W per display) and an LM2596 buck converter to 5V, or a
+  5V supply
+* Two-core cable, Wago or screw connectors
+* 6× M3 12mm bolts, 16× 3mm short countersunk screws
+
+A 5V supply works too, but the 100W+ ones tend to have loud fans; a 24V 120W
+PSU is silent and copes better with long cable runs.
+
+### Which firmware build?
+
+| Build | For |
+|---|---|
+| D1 Mini 32 + Brian Lough Matrix Shield | The original displays. That shield wires one colour line, so it uses the PxMatrix driver. |
+| ESP32 + HUB75 (DMA) | A classic ESP32 with all six colour lines wired: Brian Lough's I2S Matrix Shield, the ESP32 Trinity, or hand-wired to the default pins. Smoother, no flicker. |
+| ESP32-S3 + HUB75 (DMA) | Any ESP32-S3 with 8 MB flash. Pins are set on the Settings page. |
 
 ## Enclosure
 
-See the files in the Enclosure folder for the STLs of the two 3D-printed parts of this project, as well as the full Fusion 360 model showing you how it all fits together and what wood is required for the project.
+The `Enclosure` folder has the STLs of the 3D-printed parts and the full
+Fusion 360 model showing how it all fits together and what wood is needed.
 
 ![Back view](https://i.imgur.com/OPJ0tCZ.jpg)
 
-## Global Config Options
+## Setting up
 
-These options are available across all three displays:
+1. Open the [web flasher](https://alfo.github.io/GlowingSquare/) in Chrome or
+   Edge, pick your build, connect the board over USB and click **Install**.
+   Enter your WiFi when it asks.
+2. Or skip that: the matrix shows a setup WiFi network and its password. Join
+   it from your phone and pick your network on the page that opens.
+3. Open the address the device shows (or `http://glowingsquare.local/`), go to
+   **Settings**, choose a mode and fill in its section.
 
-* Hostname - what your device will show up in your router admin console as (can't contain spaces, etc)
-* MQTT Server - the IP or domain name of your MQTT server
-* MQTT Port - defaults to 1833
-* MQTT Username
-* MQTT Password
+**Flashing over USB with the panel connected** (Mini 32 shield): the panel's
+OE line sits on GPIO2, one of the pins the ESP32 reads at reset, and a powered
+panel holds it high, so the board refuses to enter download mode ("Wrong boot
+mode detected"). Unplug the ribbon to the panel while flashing, then plug it
+back in. Updates after the first install come over WiFi and avoid this.
 
-## MQTT Control
+The D1 Mini 32's USB chip is a CP2104, which macOS supports out of the box;
+no driver is needed.
 
-Set the room name (in the format `living_room` for example) in the web config interface, along with your MQTT server and port, etc. This will become the base of the topic when combined with the `MQTT_NAME` of your device in `mqtt.h`. Then the device will:
+To move the device to another network later, hold **BOOT** for three seconds,
+or use **Network → Change network**.
 
-* Publish on `room_name/MQTT_NAME/mqtt` `connected` or `disconnected` as a last will and testament
-* Listen on `room_name/MQTT_NAME/in` for messages in JSON format (e.g. `{ "brightness": 160 }` and will fade to the new brightness
-* Listen on `room_name/state` for messages in JSON format (e.g. `{ "party_mode": "chill" }` (or `off` or `on`)
+### Tube / London Bus
 
-## Tube / London Bus
+Find your stop's id with `https://api.tfl.gov.uk/StopPoint/Search/<name>`
+(`940GZZLUOXC` is Oxford Circus). TfL treats tube and bus stops alike.
 
-Find your TfL Stop ID [here](https://api.tfl.gov.uk/swagger/ui/index.html?url=/swagger/docs/v1#!/StopPoint/StopPoint_Search). TfL treats tube stops and bus stops the same, so if you provide the correct route and stop ID, it will work for both.
+- **Line or route**: `victoria`, `northern`, `H91`, `9`. Leave it empty for
+  every line at the stop.
+- **Direction**: inbound, outbound or both.
+- **App key**: optional. TfL limits anonymous requests heavily; a free key from
+  [api-portal.tfl.gov.uk](https://api-portal.tfl.gov.uk) avoids that.
 
-Config Options:
+### Flights
 
-* TfL Stop ID
-* TfL Route (e.g. `northern`, `circle`, `H91`, `9`), you can test your route [here](https://api.tfl.gov.uk/swagger/ui/index.html?url=/swagger/docs/v1#!/Line/Line_Arrivals)
-* Direction (options are `outbound`, `inbound`, or empty for both)
+The latitude and longitude of the middle of the area to watch, and a radius in
+nautical miles. Coming from v1's `lat1,lat2,lon1,lon2` box? The Flights
+section has a converter.
 
-## Flights
+The logos are a curated list of about 55 airlines, the ones over London and
+Heathrow's regulars, each drawn to sit on black at 16x16. Any other aircraft
+shows a plain plane. To add an airline, add a row to
+`tools/gen_airline_logos.py` and run it again.
 
-Use Google Maps or similar to find the longitude and latitude of the top left and bottom right points that define the area you want to monitor flights inside.
+### Unifi
 
-Config Options: 
+The console's address (`https://192.168.1.1`), the site (usually `default`),
+and either:
+- an **API key** (UniFi OS: *Network → Settings → Control Plane → Integrations*), or
+- a **local user and password**, for a UniFi OS console or a classic controller.
 
-* Flight Area in the format `51.5672,51.4131,-0.4146,0.1107` (for example)
+The graph is the controller's own 5-minute history, so it is full from the
+first update.
 
-## Unifi
+## MQTT and Home Assistant
 
-Unlike the other two, this one requires a PHP script running on a web server (because Unifi needs 3 different API requests to fetch the info I wanted to display, and also Unifi returns JSON payloads that are too big to fit in the RAM of the ESP32).
+Set the broker, port, user and password, and the room, on the Settings page.
+v1's topics are unchanged:
 
-Install the `GlowingSquare/Unifi/web/` files on your PHP server, and rename the `config.example.php` to `config.php`, filling in the necessary details as outlined by the code comments. Test that your server is working by visiting it in a web browser with `?width=64` appended to the URL to check you can scrape data correctly.
+- `<room>/<name>/mqtt`: `connected` / `disconnected` (retained, last will)
+- `<room>/<name>/in`: `{"brightness": 160}` fades to that brightness
+- `<room>/state`: `{"party": "chill"}`, `"on"` or `"off"`
 
-Config Options:
+`<name>` is `glowingsquare/tube`, `glowingsquare/flight` or
+`glowingsquare/unifi` for the active mode, unless you set a device topic.
 
-* Script URL as set up above, e.g. `http://10.0.1.9/glowingsquare/?width=64`
+With **Home Assistant discovery** on, the display appears in Home Assistant
+by itself: a light (on/off and brightness), selects for the mode and party
+mode, its WiFi signal and its firmware version.
 
-## Other Notes
+## Building it yourself
 
-This project was just started as a passtime during the 2020 COVID-19 lockdown as a bit of fun, happy to take questions but this isn't a long-term open source kinda deal, I'm just open-sourcing an already completed thing.
+```bash
+pio run -e gs-mini32-pxmatrix      # or gs-esp32-dma, gs-s3-dma
+scripts/check.sh                   # house rules, page scripts, sizes
+python3 test/test_render.py        # the modes against recorded API answers
+```
 
-People have asked me if I'll be selling these, and I'll consider it and come up with a rough price estimate. It's a lot easier if you don't bother with the nice enclosure, which takes roughly 30% of the cost.
+`python3 test/test_render.py --png out/` also writes a picture of each mode
+as the matrix would show it.
+
+The firmware is built on Flat Field's esp32-iot-template:
+`src/app`, `src/services`, `src/web` and `src/hardware` are its core, and
+`tools/sync_template.py` brings in its fixes (`.template-version` records
+which commit). Glowing Square itself lives in
+`src/project/`. See [AGENTS.md](AGENTS.md) for how the code is organised.
+
+## Licence
+
+GPL-3.0 (see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md)): the core comes
+from SpoolmanScale by Niko11111. The party-mode patterns are from
+[Aurora](https://github.com/pixelmatix/aurora) by Jason Coon (MIT), and
+`lib/PxMatrix` is [PxMatrix](https://github.com/2dom/PxMatrix) by Dominic
+Buchstaller (BSD), with fixes for Arduino core 3.

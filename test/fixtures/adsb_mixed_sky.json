@@ -1,0 +1,61 @@
+{
+ "now": 1794500000,
+ "ac": [
+  {
+   "hex": "406f2b",
+   "flight": "GKUBE   ",
+   "alt_baro": 900,
+   "gs": 95.0,
+   "t": "R44",
+   "dst": 0.8,
+   "baro_rate": 0
+  },
+  {
+   "hex": "4ca9c1",
+   "flight": "NJE123  ",
+   "alt_baro": 3000,
+   "gs": 210.0,
+   "t": "C68A",
+   "dst": 2.0,
+   "baro_rate": 1200
+  },
+  {
+   "hex": "4ca9e2",
+   "flight": "EZY12AB ",
+   "alt_baro": 4000,
+   "gs": 230.0,
+   "t": "A20N",
+   "dst": 6.5,
+   "baro_rate": -800
+  }
+ ],
+ "aircraft": [
+  {
+   "hex": "406f2b",
+   "flight": "GKUBE   ",
+   "alt_baro": 900,
+   "gs": 95.0,
+   "t": "R44",
+   "dst": 0.8,
+   "baro_rate": 0
+  },
+  {
+   "hex": "4ca9c1",
+   "flight": "NJE123  ",
+   "alt_baro": 3000,
+   "gs": 210.0,
+   "t": "C68A",
+   "dst": 2.0,
+   "baro_rate": 1200
+  },
+  {
+   "hex": "4ca9e2",
+   "flight": "EZY12AB ",
+   "alt_baro": 4000,
+   "gs": 230.0,
+   "t": "A20N",
+   "dst": 6.5,
+   "baro_rate": -800
+  }
+ ]
+}

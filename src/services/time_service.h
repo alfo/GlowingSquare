@@ -1,0 +1,82 @@
+#pragma once
+
+#include <Arduino.h>
+
+// One POSIX TZ string per zone, plus what to show for it.
+//
+// The POSIX form carries the switching rules, not just the offset, which is
+// the whole reason this table exists: configTime() takes numbers, and numbers
+// cannot say when summer time starts. See syncNTP() in the .cpp.
+//
+// The names are proper names and stay untranslated. "offset" is only a hint
+// for the picker, never used for arithmetic.
+struct TimeZoneEntry {
+  const char *name;
+  const char *tz;
+  const char *offset;
+};
+
+extern const TimeZoneEntry TZ_LIST[];
+extern const size_t        TZ_COUNT;
+
+void syncNTP();
+
+// Whether the clock holds a real date rather than counting from 1970. Never
+// waits, unlike getLocalTime() with its default timeout.
+bool timeClockSet();
+
+// Sets the clock from an HTTP "Date" header, but only while it is unset: on a
+// network that lets no NTP out, the backend's answers are the only clock
+// there is. Accurate to about a second, which is all the logs and the drying
+// stamps need. NTP, once it answers, takes over. True when the clock was set.
+bool timeSetFromHttpDate(const char* date);
+
+// The stored zone, or the one derived from the language on a device that has
+// never been asked. German means central Europe, everything else means UTC:
+// a language says something about the zone, but not enough to be binding.
+String timeZoneGet();
+
+// Stores the zone and applies it at once. No restart: tzset() takes effect on
+// the next localtime_r(), so the next log line is already in the new zone.
+void   timeZoneSet(const char *tz);
+
+// Hands the stored zone to the C library. Called at boot, before anything
+// formats a time, and again by timeZoneSet().
+void   timeZoneApply();
+
+// Display name of the stored zone, for the button that opens the picker.
+// Falls back to the raw POSIX string for a zone that is not in the table.
+const char* timeZoneName();
+
+// Index into TZ_LIST, or -1 when the stored zone is not one of them.
+int    timeZoneIndex();
+
+// The zone a language implies, as an index into TZ_LIST. German means central
+// Europe, everything else means UTC. Used for the fallback above and for the
+// pre-selection on the setup screen, so the two cannot drift apart.
+int    timeZoneDefaultIndexForLang(uint8_t lang);
+
+// Turns a stored timestamp into the calendar day it fell on locally.
+//
+// Spoolman and FilaMan keep instants in UTC, and near midnight the UTC date
+// is not the local one: a spool dried at 00:07 in summer carries a UTC stamp
+// from 22:07 the day before, and reading the first ten characters off it
+// reports yesterday. Anything without a Z - BamBuddy's date-only note marker,
+// for one - is already a local day and is passed through untouched.
+void isoDayLocal(const char* iso, char* out_day, size_t out_size);
+
+// Now, as a UTC instant in the form both servers store: "2026-09-16T08:31:00
+// .000Z". The other half of isoDayLocal() - writing local time under a Z put
+// their display two hours into the future, which is the bug that made the
+// pair necessary in the first place.
+//
+// Falls back to a fixed stamp when the clock has never been set, so a write
+// carries something parseable rather than 1970. Returns false in that case, so
+// a caller that would rather not write at all can decide for itself.
+bool nowIsoUtc(char* out, size_t out_size);
+
+// A local calendar day "YYYY-MM-DD" as the UTC instant of its local noon,
+// in the same form as nowIsoUtc(). Noon, because a date without a time has
+// to come back as the same day through isoDayLocal() in any zone up to
+// twelve hours away. Needs the zone, not the clock. False on a malformed day.
+bool dayLocalNoonUtc(const char* day, char* out, size_t out_size);
