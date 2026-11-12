@@ -1,0 +1,42 @@
+{
+ "meta": {
+  "rc": "ok"
+ },
+ "data": [
+  {
+   "subsystem": "wlan",
+   "num_user": 32,
+   "num_guest": 0,
+   "num_iot": 5,
+   "tx_bytes-r": 81234,
+   "rx_bytes-r": 20345,
+   "status": "ok"
+  },
+  {
+   "subsystem": "wan",
+   "num_gw": 1,
+   "status": "ok",
+   "tx_bytes-r": 125000.0,
+   "rx_bytes-r": 1250000.0,
+   "wan_ip": "203.0.113.7"
+  },
+  {
+   "subsystem": "www",
+   "status": "ok",
+   "tx_bytes-r": 125000,
+   "rx_bytes-r": 1250000,
+   "latency": 9
+  },
+  {
+   "subsystem": "lan",
+   "num_user": 34,
+   "status": "ok",
+   "tx_bytes-r": 30000,
+   "rx_bytes-r": 9000
+  },
+  {
+   "subsystem": "vpn",
+   "status": "unknown"
+  }
+ ]
+}

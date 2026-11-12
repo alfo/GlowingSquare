@@ -5,7 +5,9 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <cassert>
+#include <ctime>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <vector>
 
@@ -60,8 +62,9 @@ static std::string answerFor(const char *url, int &code, char *err, size_t n) {
     { "opendata.adsb.fi",            "adsbfi_london.json" },
     { "api.adsbdb.com",              "adsbdb_THA917.json" },
     { "stat/sta",                    "unifi_sta.json" },
-    { "stat/report/5minutes.site",   "unifi_5min.json" },
-    { "stat/report/daily.site",      "unifi_daily.json" },
+    // Made up in the shape of a UDM Pro's answer (November 2026): the WAN
+    // at 10 Mbit/s down, 1 Mbit/s up.
+    { "stat/health",                 "unifi_health.json" },
   };
   for (auto &m : MAP) {
     if (!strstr(url, m.part)) continue;
@@ -171,6 +174,13 @@ static bool rowHasColour(int y0, uint16_t c) {
   for (int y = y0; y < y0 + 8; y++) for (int x = 0; x < MATRIX_W; x++) if (px(x, y) == c) return true;
   return false;
 }
+
+// NVS for the host: a map, so a mode's saved values can be checked.
+static std::map<std::string, long long> g_prefs;
+int prefsGetInt(const char *k, int d) { auto i = g_prefs.find(k); return i == g_prefs.end() ? d : (int)i->second; }
+uint32_t prefsGetUInt(const char *k, uint32_t d) { auto i = g_prefs.find(k); return i == g_prefs.end() ? d : (uint32_t)i->second; }
+bool prefsPutInt(const char *k, int v) { g_prefs[k] = v; return true; }
+bool prefsPutUInt(const char *k, uint32_t v) { g_prefs[k] = v; return true; }
 
 static bool urlAsked(const char *part) {
   for (auto &u : g_urls) if (u.find(part) != std::string::npos) return true;
@@ -349,8 +359,25 @@ int main(int argc, char **argv) {
   g_unifi_auth = UNIFI_AUTH_KEY;
   MODE_UNIFI_OPS.enter();
   fetchCommit(MODE_UNIFI_OPS);
+  assert(!rowHasColour(24, rgb565(21, 58, 234)));      // no graph yet: one sample
+  // Half an hour of fetches a minute apart: six 5-minute buckets.
+  for (int i = 0; i < 30; i++) { g_fake_ms += 60000; fetchCommit(MODE_UNIFI_OPS); }
   dump("unifi_start");
   assert(rowHasColour(24, rgb565(21, 58, 234)));       // the graph
+  {
+    int columns = 0;
+    for (int x = 0; x < MATRIX_W; x++) columns += px(x, MATRIX_H - 1) == rgb565(21, 58, 234);
+    assert(columns >= 5 && columns <= 6);              // a column a completed bucket
+  }
+  // The month so far, saved: 30 min at 1.25 MB/s down is 2,250 MB.
+  {
+    const time_t now = time(nullptr);
+    struct tm t;
+    localtime_r(&now, &t);
+    assert(g_prefs["uf_month"] == (t.tm_year + 1900) * 12 + t.tm_mon);
+    assert(g_prefs["uf_rx_mb"] == 2250);               // saved at 0, 15 and 30 minutes
+    assert(g_prefs["uf_tx_mb"] == 225);
+  }
   runFor(MODE_UNIFI_OPS, 1500);
   dump("unifi_new_client");
 
