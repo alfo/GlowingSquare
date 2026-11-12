@@ -52,6 +52,10 @@ static std::string answerFor(const char *url, int &code, char *err, size_t n) {
     { "940GZZLUNHG?11nov",           "tfl_nhg_mislabelled.json" },
     { "api.tfl.gov.uk/StopPoint",    "tfl_nhg_stop.json" },
     { "api.tfl.gov.uk",              "tfl_victoria_oxc.json" },
+    // Made-up skies, by the latitude asked. Each has the aircraft under both
+    // feeds' keys ("ac" and "aircraft"), so either feed can be asked first.
+    { "51.6001",                     "adsb_mixed_sky.json" },
+    { "51.6002",                     "adsb_no_listed_airline.json" },
     { "api.adsb.lol",                "adsb_london.json" },
     { "opendata.adsb.fi",            "adsbfi_london.json" },
     { "api.adsbdb.com",              "adsbdb_THA917.json" },
@@ -165,6 +169,11 @@ static void dump(const char *name) {
 static uint16_t px(int x, int y) { return matrixCanvas().getPixel(x, y); }
 static bool rowHasColour(int y0, uint16_t c) {
   for (int y = y0; y < y0 + 8; y++) for (int x = 0; x < MATRIX_W; x++) if (px(x, y) == c) return true;
+  return false;
+}
+
+static bool urlAsked(const char *part) {
+  for (auto &u : g_urls) if (u.find(part) != std::string::npos) return true;
   return false;
 }
 
@@ -316,6 +325,23 @@ int main(int argc, char **argv) {
   assert(markIs(airlineLogo("THA")));                  // a flight, not a dark panel
   g_down = nullptr;
   g_down_code = -1;
+
+  // An airline is shown over anything nearer that is not one: easyJet at
+  // 6.5 nm over NetJets at 2 nm and a helicopter at 0.8 nm.
+  snprintf(g_fl_lat, sizeof g_fl_lat, "51.6001");
+  g_urls.clear();
+  fetchCommit(MODE_FLIGHTS_OPS);
+  dump("flights_airline_first");
+  assert(markIs(airlineLogo("EZY")));
+  assert(urlAsked("callsign/EZY12AB"));
+  // No airline on the list: an airline-style callsign over a registration.
+  snprintf(g_fl_lat, sizeof g_fl_lat, "51.6002");
+  g_urls.clear();
+  fetchCommit(MODE_FLIGHTS_OPS);
+  assert(urlAsked("callsign/NJE123") && !urlAsked("callsign/GKUBE"));
+  assert(px(0, 8) == rgb565(120, 120, 120));           // the plane, not a logo
+  assert(flightRank("EZY12AB") == 2 && flightRank("NJE123") == 1 && flightRank("GKUBE") == 0);
+  snprintf(g_fl_lat, sizeof g_fl_lat, "51.5074");
 
   // ---- Unifi ----
   snprintf(g_unifi_url, sizeof g_unifi_url, "https://192.168.1.1");

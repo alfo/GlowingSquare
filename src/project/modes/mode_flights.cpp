@@ -115,6 +115,7 @@ static size_t s_feed = 0;   // the fetch task's alone
 // The nearest aircraft so far, copied out of each element as it is parsed.
 struct Nearest {
   bool     found = false;
+  uint8_t  rank = 0;          // flightRank() of the one kept
   float    dst = 1e9f;
   char     callsign[10] = "";
   char     type[8] = "";
@@ -124,7 +125,9 @@ struct Nearest {
 };
 
 // One aircraft from the feed: kept if it is in the air, high enough, has a
-// callsign to look up, and is nearer than the best so far.
+// callsign to look up, and beats the best so far: a better flightRank(), or
+// the same and nearer. An airline at the edge of the radius is shown over a
+// helicopter overhead.
 static void consider(JsonObjectConst a, void *ctx) {
   Nearest &n = *(Nearest *)ctx;
   if (!a["alt_baro"].is<int>()) return;               // "ground"
@@ -133,8 +136,10 @@ static void consider(JsonObjectConst a, void *ctx) {
   const char *cs = a["flight"] | "";
   if (!cs[0]) return;
   const float d = a["dst"] | 1e8f;
-  if (d >= n.dst) return;
+  const uint8_t rank = flightRank(cs);
+  if (n.found && (rank < n.rank || (rank == n.rank && d >= n.dst))) return;
   n.found = true;
+  n.rank = rank;
   n.dst = d;
   n.altitude = alt;
   n.speed = a["gs"] | 0.0f;

@@ -44,3 +44,14 @@ static inline const uint16_t *airlineLogo(const char *prefix) {
     if (strcmp(AIRLINE_LOGOS[i].prefix, prefix) == 0) return AIRLINE_LOGOS[i].img;
   return nullptr;
 }
+
+// How much the Flights mode wants to show a callsign: an airline on the
+// list (2) over any other airline-style callsign (1, NetJets' NJE123) over
+// a registration (0, a light aircraft or a helicopter). The nearest of the
+// best rank in range is shown, however near a lower one is.
+static inline uint8_t flightRank(const char *callsign) {
+  char p[4];
+  airlinePrefix(callsign, p);
+  if (!p[0]) return 0;
+  return airlineLogo(p) ? 2 : 1;
+}
