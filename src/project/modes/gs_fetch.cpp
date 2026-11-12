@@ -59,7 +59,8 @@ static bool networkBusy() {
   return updateCheckBusy() || gh_flash_active || webJobState() == WJS_RUNNING;
 }
 
-static void collect() {
+// True when the answer was committed, and so drawn.
+static bool collect() {
   const DisplayMode *m = s_running_mode;
   s_state = FS_IDLE;
   if (s_stack_left < s_stack_logged) {
@@ -68,21 +69,22 @@ static void collect() {
            (unsigned)FETCH_STACK_BYTES);
   }
   // The mode was switched while this ran: its answer is for nobody.
-  if (m != &modeOps(g_mode)) return;
+  if (m != &modeOps(g_mode)) return false;
   if (s_ok) {
     if (s_fails >= FAILS_FOR_OFFLINE) logSDf("%s: back online", m->key);
     s_fails = 0;
     s_last_err[0] = '\0';
     s_last_ok_ms = millis() ? millis() : 1;
     m->commit();
-    return;
+    return true;
   }
   snprintf(s_last_err, sizeof(s_last_err), "%s", s_err);
   if (s_fails < 255) s_fails++;
   if (s_fails == 1 || s_fails == FAILS_FOR_OFFLINE) logSDf("%s: fetch failed (%s)", m->key, s_err);
+  return false;
 }
 
-void fetchTick() {
+bool fetchTick() {
   // Failures belong to a mode: switching starts the count again.
   static uint8_t s_counted_mode = 255;
   if (s_counted_mode != g_mode) {
@@ -90,14 +92,14 @@ void fetchTick() {
     s_fails = 0;
     s_last_err[0] = '\0';
   }
-  if (s_state == FS_DONE) collect();
-  if (s_state != FS_IDLE) return;
-  if (!wifi_ok || g_party != PARTY_OFF || g_brightness_target == 0) return;
+  const bool drawn = s_state == FS_DONE && collect();
+  if (s_state != FS_IDLE) return drawn;
+  if (!wifi_ok || g_party != PARTY_OFF || g_brightness_target == 0) return drawn;
 
   const DisplayMode &m = modeOps(g_mode);
   const bool due = !s_started_once || s_now || millis() - s_last_start_ms >= m.interval_ms;
-  if (!due || networkBusy()) return;
-  if (!workerHeapReady("[fetch]", workerFloorTls(), FETCH_STACK_BYTES, &s_heap_gate)) return;
+  if (!due || networkBusy()) return drawn;
+  if (!workerHeapReady("[fetch]", workerFloorTls(), FETCH_STACK_BYTES, &s_heap_gate)) return drawn;
 
   s_now = false;
   s_started_once = true;
@@ -109,6 +111,7 @@ void fetchTick() {
     s_state = FS_IDLE;
     logSD("[fetch] task creation failed");
   }
+  return drawn;
 }
 
 // From the web job task: the same fetch, but nothing is committed. Only one

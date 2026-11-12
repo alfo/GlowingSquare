@@ -34,7 +34,9 @@ extern const DisplayMode MODE_UNIFI_OPS;
 const DisplayMode &modeOps(uint8_t mode);
 
 // The fetch scheduler (gs_fetch.cpp).
-void fetchTick();             // from the loop
+// From the loop. True when a fetch's answer was committed: the mode has
+// drawn it on the canvas, and the canvas must go to the panel.
+bool fetchTick();
 void fetchNow();              // the next pass fetches, whatever the interval
 bool fetchBusy();             // a fetch is running or waiting to be collected
 bool fetchOffline();          // three failures in a row: the red dot

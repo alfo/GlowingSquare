@@ -153,7 +153,13 @@ static void projectLoop() {
   const uint32_t now = millis();
   matrixStartTick(now);
   fadeTick(now);
-  fetchTick();
+  // A new answer is drawn on the canvas by its mode's commit(), and must be
+  // pushed like any other change. It was not, from the start: Tube scrolled,
+  // which pushed it soon after, but Flights draws once and its frame() asks
+  // for nothing, so a flight reached the panel only when something else
+  // happened to push (a mode switch, the offline dot, the end of an
+  // update). On 11 and 12.11.2026 the Flight panel stayed dark for hours.
+  const bool committed = fetchTick();
   mqttTick();
 
   bool dirty = false;
@@ -196,7 +202,7 @@ static void projectLoop() {
       else                 modeOps(g_mode).enter();
       dirty = true;
     }
-    if (!s_shown_offline) dirty |= modeOps(g_mode).frame(now);
+    if (!s_shown_offline) dirty |= committed | modeOps(g_mode).frame(now);
   }
   if (dirty && s_matrix_ok) matrixShow();
   refreshWatch(now);

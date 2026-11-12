@@ -57,9 +57,12 @@ void matrixApplyTiming();
 bool matrixHold(int16_t y);
 
 // Starts the refresh again when it has stopped (the refresh watch in
-// project.cpp asks). On 11.11.2026 a running PxMatrix refresh stopped for
-// good, panel black; releasing the update hold, which restarts its timer,
-// brought it back. The DMA build refreshes by itself: nothing to do.
+// project.cpp asks). Written when the Flight panel went black on 11.11.2026
+// and releasing the update hold brought it back. That release also pushed
+// the canvas, and the panel was more likely dark because new flights were
+// never pushed (project.cpp, projectLoop). Kept as a safeguard: a refresh
+// that stops leaves a panel black whatever is drawn. The DMA build
+// refreshes by itself: nothing to do.
 void matrixRestartRefresh();
 
 // Which driver this build has, for the Status page and the log.
