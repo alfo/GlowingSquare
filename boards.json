@@ -1,6 +1,6 @@
 {
   "app": "Glowing Square",
-  "version": "v2.0.0-beta.9",
+  "version": "v2.0.0-beta.10",
   "accent": {
     "dark": "#ff7a1a",
     "light": "#b84d00"
@@ -12,7 +12,7 @@
       "note": "The original Glowing Square hardware (PxMatrix driver, P4 64x32 panel).",
       "chip": "ESP32",
       "manifest": "fw/gs-mini32-pxmatrix/manifest.json",
-      "version": "v2.0.0-beta.9"
+      "version": "v2.0.0-beta.10"
     },
     {
       "env": "gs-esp32-dma",
@@ -20,7 +20,7 @@
       "note": "Classic ESP32 with all six colour lines wired (I2S Matrix Shield, Trinity, or the library's default pins).",
       "chip": "ESP32",
       "manifest": "fw/gs-esp32-dma/manifest.json",
-      "version": "v2.0.0-beta.9"
+      "version": "v2.0.0-beta.10"
     },
     {
       "env": "gs-s3-dma",
@@ -28,7 +28,7 @@
       "note": "Any ESP32-S3 with 8 MB flash, HUB75 pins set in the Settings page.",
       "chip": "ESP32-S3",
       "manifest": "fw/gs-s3-dma/manifest.json",
-      "version": "v2.0.0-beta.9"
+      "version": "v2.0.0-beta.10"
     }
   ]
 }
