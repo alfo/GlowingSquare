@@ -149,6 +149,7 @@ AIRLINES = [
     ("QR", "QTR", {"tint": "#c8406e"}),
     ("EY", "ETD", {}),
     ("SQ", "SIA", {}),
+    ("MH", "MAS", {"tint": "#e2231a"}),
     ("CX", "CPA", {}),
     ("AI", "AIC", {}),
     ("TG", "THA", {}),
