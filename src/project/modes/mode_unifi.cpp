@@ -7,16 +7,16 @@
 // arrived cut off (IncompleteInput, 12.11.2026), as TfL's had.
 //
 // What it reads, all through the Network application's API:
-//   stat/sta     clients: count, guests, the newest one
-//   stat/health  the WAN's rates now, down and up, bytes a second
+//   stat/sta              clients: count, guests, the newest one
+//   v2 aggregated-dashboard, its wan_activity widget alone:
+//     the last 100 x 5 minutes   WAN download rate: the graph, every 5 min
+//     since the 1st, 8-hourly    WAN rates, times their hours: the month's
+//                                totals, every 30 min
 //
-// The graph and the month's totals are built here from those rates, a
-// sample every fetch. v1 read them from stat/report/5minutes.site and
-// daily.site, which a UniFi Network update in November 2026 left empty on
-// a UDM Pro, for v1's script as much as this. So the graph starts empty at
-// power-on and fills across the panel in 64 x 5 minutes; the month's totals
-// are kept in NVS and count from the first month this ran. Both are
-// estimates: a rate sampled every 30 s, times 30 s.
+// v1 read the graph and totals from stat/report/5minutes.site and
+// daily.site. A UniFi Network update in November 2026 left those empty (for
+// v1's script too) and reset the console's history: the dashboard the
+// Network app draws its own charts from has it since then.
 //
 // Sign-in: an API key (UniFi OS consoles, the X-API-KEY header), or a user
 // and password for a console or a classic controller.
@@ -37,18 +37,17 @@
 #include "project/icons.h"
 #include "project/modes/modes.h"
 #include "project/render.h"
-#include "services/prefs_store.h"
 
 #define GRAPH_HEIGHT       8
 #define GRAPH_SCALE_POINTS 100   // v1: the scale comes from the last 100 buckets
 #define BUCKET_MS          (5UL * 60UL * 1000UL)
 #define NEW_CLIENT_S       120   // v1: INFO_UPDATE_INTERVAL * 4 / 1000
 #define NEW_SCROLL_MS      50    // v1 scrolled this row at 50 ms a pixel
-// A gap between two samples longer than this (failed fetches, a restart of
-// the console) counts as this long: the rate then says little about the gap.
-#define SAMPLE_MAX_MS      (90UL * 1000UL)
-#define MONTH_SAVE_MS      (15UL * 60UL * 1000UL)
-#define BYTES_PER_MB       1000000.0
+#define BUCKET_S           300UL
+#define GRAPH_EVERY_MS     BUCKET_MS                   // a new bucket at most this often
+#define MONTH_EVERY_MS     (30UL * 60UL * 1000UL)
+#define MONTH_STEP_S       (8UL * 3600UL)              // the dashboard's step over weeks
+#define BITS_PER_BYTE      8.0
 
 struct UnifiData {
   char     month_rx_text[16] = "-", month_tx_text[16] = "-";
@@ -56,8 +55,6 @@ struct UnifiData {
   uint8_t  graph[MATRIX_W] = {0};
   char     newest[40] = "";
   uint32_t min_uptime = UINT32_MAX;
-  int32_t  month = -1;              // year * 12 + month, -1 before the clock is set
-  double   month_rx = 0, month_tx = 0;   // bytes this month since power-on
   char     warn[96] = "";   // an extra that failed, logged by commit()
 };
 
@@ -134,17 +131,19 @@ static bool login(char *err, size_t err_n) {
 struct ApiCall {
   const char         *path;
   const char         *body;     // POSTed when set
-  const JsonDocument *filter;   // for one element of "data"
+  const JsonDocument *filter;   // for one element of the list
   GsJsonEach          each;
   void               *ctx;
+  const char         *list = "data";   // the array walked
+  bool                v2 = false;      // under v2/api/site/, not api/s/
 };
 
 // A refused session is renewed once.
 static int api(const ApiCall &call, char *err, size_t err_n) {
   char url[192], b[64];
   base(b, sizeof(b));
-  snprintf(url, sizeof(url), "%s%s/api/s/%s/%s", b, isClassic() ? "" : "/proxy/network",
-           g_unifi_site, call.path);
+  snprintf(url, sizeof(url), call.v2 ? "%s%s/v2/api/site/%s/%s" : "%s%s/api/s/%s/%s", b,
+           isClassic() ? "" : "/proxy/network", g_unifi_site, call.path);
 
   for (int attempt = 0; attempt < 2; attempt++) {
     if (g_unifi_auth != UNIFI_AUTH_KEY && !s_cookie.length() && !login(err, err_n)) return -1;
@@ -163,7 +162,7 @@ static int api(const ApiCall &call, char *err, size_t err_n) {
       req.headers[h++] = s_cookie.c_str();
       if (s_csrf.length()) { req.headers[h++] = "X-CSRF-Token"; req.headers[h++] = s_csrf.c_str(); }
     }
-    const int code = gsHttpJsonEach(req, "data", *call.filter, call.each, call.ctx, err, err_n);
+    const int code = gsHttpJsonEach(req, call.list, *call.filter, call.each, call.ctx, err, err_n);
     if ((code == 401 || code == 403) && g_unifi_auth != UNIFI_AUTH_KEY && attempt == 0) {
       s_cookie = "";
       continue;
@@ -198,101 +197,111 @@ static bool readClients(char *err, size_t err_n) {
   return gsHttpOk(api(call, err, err_n));
 }
 
-// ---- the WAN, sampled (fetch task) -------------------------------------------
+// ---- the WAN, from the dashboard (fetch task) ----------------------------------
 
-struct WanRates {
-  bool  found = false;
-  float rx = 0, tx = 0;   // bytes a second
-};
-
-static void wanRates(JsonObjectConst sub, void *ctx) {
-  if (strcmp(sub["subsystem"] | "", "wan") != 0) return;
-  WanRates &r = *(WanRates *)ctx;
-  r.found = true;
-  r.rx = sub["rx_bytes-r"] | 0.0f;
-  r.tx = sub["tx_bytes-r"] | 0.0f;
-}
-
-static bool readRates(WanRates &rates, char *err, size_t err_n) {
+// The dashboard's WAN history for the last `seconds`. In the answer for the
+// wan_activity widget alone, the first "history" array is the WAN's.
+static int readWanHistory(uint32_t seconds, GsJsonEach each, void *ctx, char *err, size_t err_n) {
+  char path[96];
+  snprintf(path, sizeof(path), "aggregated-dashboard?historySeconds=%lu&widgets=wan_activity",
+           (unsigned long)seconds);
   JsonDocument filter;
-  filter["subsystem"] = true;
-  filter["rx_bytes-r"] = true;
-  filter["tx_bytes-r"] = true;
-  const ApiCall call = { "stat/health", nullptr, &filter, wanRates, &rates };
-  if (!gsHttpOk(api(call, err, err_n))) return false;
-  if (!rates.found) snprintf(err, err_n, "no WAN in stat/health");
-  return rates.found;
+  filter["timestamp"] = true;
+  filter["avg_rx_rate_bps"] = true;
+  filter["avg_tx_rate_bps"] = true;
+  ApiCall call = { path, nullptr, &filter, each, ctx };
+  call.list = "history";
+  call.v2 = true;
+  return api(call, err, err_n);
 }
 
-// Down bytes per completed 5-minute bucket, the last GRAPH_SCALE_POINTS in a
-// ring, and the month so far. The fetch task's alone; the month reaches the
-// loop through s_next.
-struct WanHistory {
-  float    bucket[GRAPH_SCALE_POINTS];
-  uint16_t done = 0;        // buckets completed
-  uint32_t index = 0;       // millis() / BUCKET_MS of the one being filled
-  double   cur = 0;         // down bytes in it so far
-  uint32_t last_ms = 0;     // the last sample, 0 before the first
-  int32_t  month = -1;
-  double   month_rx = 0, month_tx = 0;
+// Download rate per 5-minute bucket, oldest first, the last
+// GRAPH_SCALE_POINTS in a ring. Fetched every GRAPH_EVERY_MS and kept
+// between: the fetch task's alone.
+struct Buckets {
+  float    v[GRAPH_SCALE_POINTS];
+  uint16_t n = 0;
 };
-static WanHistory s_wan;
+static Buckets  s_buckets;
+static uint32_t s_graph_ms = 0;   // when it was last fetched, 0 for never
 
-static int32_t monthNow() {
-  const time_t now = time(nullptr);
-  if (now < 1700000000) return -1;   // no clock yet
-  struct tm t;
-  localtime_r(&now, &t);
-  return (t.tm_year + 1900) * 12 + t.tm_mon;
-}
-
-// Closes the buckets that ended before `now_ms`. A long gap closes at most a
-// graph's worth: the rest would only be empty buckets scrolled off again.
-static void closeBuckets(uint32_t now_ms) {
-  const uint32_t index = now_ms / BUCKET_MS;
-  for (int k = 0; s_wan.index < index && k < GRAPH_SCALE_POINTS; k++, s_wan.index++) {
-    s_wan.bucket[s_wan.done % GRAPH_SCALE_POINTS] = (float)s_wan.cur;
-    s_wan.done++;
-    s_wan.cur = 0;
-  }
-  s_wan.index = index;
-}
-
-static void addSample(const WanRates &r, uint32_t now_ms) {
-  const int32_t m = monthNow();
-  if (m >= 0 && m != s_wan.month) { s_wan.month = m; s_wan.month_rx = s_wan.month_tx = 0; }
-  if (!s_wan.last_ms) {   // the first: a starting point, nothing to add yet
-    s_wan.last_ms = now_ms ? now_ms : 1;
-    s_wan.index = now_ms / BUCKET_MS;
-    return;
-  }
-  uint32_t dt = now_ms - s_wan.last_ms;
-  if (dt > SAMPLE_MAX_MS) dt = SAMPLE_MAX_MS;
-  s_wan.last_ms = now_ms ? now_ms : 1;
-  const double down = (double)r.rx * dt / 1000.0, up = (double)r.tx * dt / 1000.0;
-  closeBuckets(now_ms);
-  s_wan.cur += down;
-  if (m < 0) return;   // no clock yet: no month to count it in
-  s_wan.month_rx += down;
-  s_wan.month_tx += up;
+static void addBucket(JsonObjectConst e, void *ctx) {
+  Buckets &k = *(Buckets *)ctx;
+  k.v[k.n % GRAPH_SCALE_POINTS] = e["avg_rx_rate_bps"] | 0.0f;
+  k.n++;
 }
 
 // Bucket i of the last `count`, oldest first.
 static float bucketAt(int count, int i) {
-  return s_wan.bucket[(s_wan.done - count + i) % GRAPH_SCALE_POINTS];
+  return s_buckets.v[(s_buckets.n - count + i) % GRAPH_SCALE_POINTS];
 }
 
-// The graph from the completed buckets, newest last: v1's scale (the largest
-// of the last 100) and its slice (the newest 64, from the left edge).
+// v1's scale (the largest of the last 100) and its slice (the newest 64,
+// from the left edge).
 static void graphInto(UnifiData &d) {
-  const int n = s_wan.done < GRAPH_SCALE_POINTS ? s_wan.done : GRAPH_SCALE_POINTS;
-  float max_bytes = 0;
-  for (int i = 0; i < n; i++) max_bytes = fmaxf(max_bytes, bucketAt(n, i));
+  const int n = s_buckets.n < GRAPH_SCALE_POINTS ? s_buckets.n : GRAPH_SCALE_POINTS;
+  float top = 0;
+  for (int i = 0; i < n; i++) top = fmaxf(top, bucketAt(n, i));
   const int shown = n < MATRIX_W ? n : MATRIX_W;
   for (int x = 0; x < shown; x++) {
     const float b = bucketAt(n, n - shown + x);
-    d.graph[x] = max_bytes > 0 ? (uint8_t)ceilf(b / max_bytes * GRAPH_HEIGHT) : 0;
+    d.graph[x] = top > 0 ? (uint8_t)ceilf(b / top * GRAPH_HEIGHT) : 0;
   }
+}
+
+static bool readGraph(char *err, size_t err_n) {
+  if (s_graph_ms && millis() - s_graph_ms < GRAPH_EVERY_MS) return true;
+  Buckets fresh;
+  if (!gsHttpOk(readWanHistory(GRAPH_SCALE_POINTS * BUCKET_S, addBucket, &fresh, err, err_n)))
+    return false;
+  s_buckets = fresh;
+  s_graph_ms = millis() ? millis() : 1;
+  return true;
+}
+
+// The month: each entry's average rate for as long as it lasted (up to the
+// next entry; the last, still running, until now).
+struct MonthSum {
+  double   rx = 0, tx = 0;     // bytes
+  uint64_t prev_ms = 0;        // the entry before, waiting for its end
+  float    prev_rx = 0, prev_tx = 0;
+};
+static char     s_month_rx[16] = "-", s_month_tx[16] = "-";
+static uint32_t s_month_ms = 0;
+
+static void addSpan(MonthSum &m, uint64_t end_ms) {
+  if (!m.prev_ms || end_ms <= m.prev_ms) return;
+  const double s = (double)(end_ms - m.prev_ms) / 1000.0;
+  m.rx += m.prev_rx / BITS_PER_BYTE * s;
+  m.tx += m.prev_tx / BITS_PER_BYTE * s;
+}
+
+static void addMonthEntry(JsonObjectConst e, void *ctx) {
+  MonthSum &m = *(MonthSum *)ctx;
+  const uint64_t ts = e["timestamp"] | (uint64_t)0;
+  addSpan(m, ts);
+  m.prev_ms = ts;
+  m.prev_rx = e["avg_rx_rate_bps"] | 0.0f;
+  m.prev_tx = e["avg_tx_rate_bps"] | 0.0f;
+}
+
+static bool readMonth(char *err, size_t err_n) {
+  if (s_month_ms && millis() - s_month_ms < MONTH_EVERY_MS) return true;
+  const time_t now = time(nullptr);
+  if (now < 1700000000) return true;   // no clock yet: the totals stay "-"
+  struct tm t;
+  localtime_r(&now, &t);
+  t.tm_mday = 1; t.tm_hour = 0; t.tm_min = 0; t.tm_sec = 0;
+  const time_t start = mktime(&t);
+  MonthSum m;
+  if (!gsHttpOk(readWanHistory((uint32_t)(now - start), addMonthEntry, &m, err, err_n))) return false;
+  const uint64_t now_ms = (uint64_t)now * 1000ULL;
+  const uint64_t step_end = m.prev_ms + MONTH_STEP_S * 1000ULL;
+  addSpan(m, now_ms < step_end ? now_ms : step_end);
+  formatBytes(m.rx, s_month_rx, sizeof(s_month_rx));
+  formatBytes(m.tx, s_month_tx, sizeof(s_month_tx));
+  s_month_ms = millis() ? millis() : 1;
+  return true;
 }
 
 static bool unifiFetch(char *err, size_t err_n) {
@@ -300,49 +309,17 @@ static bool unifiFetch(char *err, size_t err_n) {
   if (g_unifi_auth == UNIFI_AUTH_KEY && !g_unifi_key[0]) { snprintf(err, err_n, "no API key set"); return false; }
   s_next = UnifiData();
   if (!readClients(err, err_n)) return false;
-  // The rates are extras: a console that refuses them still shows the
-  // clients, and commit() logs why (the log is the loop task's).
-  WanRates rates;
+  // The graph and the totals are extras: a console that refuses them still
+  // shows the clients, and commit() logs why (the log is the loop task's).
   char e2[64];
-  if (readRates(rates, e2, sizeof(e2))) addSample(rates, millis());
-  else snprintf(s_next.warn, sizeof(s_next.warn), "WAN rates unavailable (%s)", e2);
+  if (!readGraph(e2, sizeof(e2)))
+    snprintf(s_next.warn, sizeof(s_next.warn), "graph unavailable (%s)", e2);
+  else if (!readMonth(e2, sizeof(e2)))
+    snprintf(s_next.warn, sizeof(s_next.warn), "month totals unavailable (%s)", e2);
   graphInto(s_next);
-  s_next.month = s_wan.month;
-  s_next.month_rx = s_wan.month_rx;
-  s_next.month_tx = s_wan.month_tx;
+  snprintf(s_next.month_rx_text, sizeof(s_next.month_rx_text), "%s", s_month_rx);
+  snprintf(s_next.month_tx_text, sizeof(s_next.month_tx_text), "%s", s_month_tx);
   return true;
-}
-
-// ---- the month, kept (loop task) ----------------------------------------------
-
-// What NVS held at power-on for its month, in MB; this run's bytes are added
-// to it. Saved every MONTH_SAVE_MS, so a restart loses at most that much.
-static int32_t  s_base_month = -2;   // -2: not read yet
-static uint32_t s_base_rx_mb = 0, s_base_tx_mb = 0;
-static uint32_t s_month_saved_ms = 0;
-
-static void monthTotals(UnifiData &d) {
-  if (s_base_month == -2) {
-    s_base_month = prefsGetInt("uf_month", -1);
-    s_base_rx_mb = prefsGetUInt("uf_rx_mb", 0);
-    s_base_tx_mb = prefsGetUInt("uf_tx_mb", 0);
-  }
-  if (d.month < 0) return;   // no clock yet: the totals stay "-"
-  if (d.month != s_base_month) {   // a new month, or the first ever
-    s_base_month = d.month;
-    s_base_rx_mb = s_base_tx_mb = 0;
-    s_month_saved_ms = 0;
-  }
-  const double rx = s_base_rx_mb * BYTES_PER_MB + d.month_rx;
-  const double tx = s_base_tx_mb * BYTES_PER_MB + d.month_tx;
-  formatBytes(rx, d.month_rx_text, sizeof(d.month_rx_text));
-  formatBytes(tx, d.month_tx_text, sizeof(d.month_tx_text));
-  if (s_month_saved_ms && millis() - s_month_saved_ms < MONTH_SAVE_MS) return;
-  s_month_saved_ms = millis() ? millis() : 1;
-  const bool ok = prefsPutInt("uf_month", d.month) &&
-                  prefsPutUInt("uf_rx_mb", (uint32_t)(rx / BYTES_PER_MB)) &&
-                  prefsPutUInt("uf_tx_mb", (uint32_t)(tx / BYTES_PER_MB));
-  if (!ok) logSD("Unifi: the month's totals could not be saved");
 }
 
 // ---- drawing (loop task) ----------------------------------------------------
@@ -384,7 +361,6 @@ static void unifiEnter()  { draw(); }
 static void unifiCommit() {
   // Logged once a change: the same failure every 30 s says nothing new.
   if (s_next.warn[0] && strcmp(s_next.warn, s_cur.warn) != 0) logSDf("Unifi: %s", s_next.warn);
-  monthTotals(s_next);
   s_cur = s_next;
   draw();
 }
