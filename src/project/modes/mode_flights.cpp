@@ -2,15 +2,16 @@
 // route from adsbdb.com (all free, no key). Replaces v1's Flightradar24 feed,
 // an unofficial endpoint that came with no promise to keep working.
 //
-// Layout as v1:
-//   FROM>TO        cyan
-//   flight number  white
-//   altitude ft    green above 10,000 ft, red below
-//   speed kts      white, then the aircraft type in cyan
+// Layout (v1's four lines, redrawn in November 2026 around the airline):
+//   [mark]  FROM>TO          the airline's mark, 16x16 (airline_logos.h)
+//   [mark]  flight number
+//   ^ 2,475ft                climbing, descending or level, then altitude
+//   185kt            B788    speed, aircraft type
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <math.h>
 
+#include "project/airline_logos.h"
 #include "project/gs_http.h"
 #include "project/gs_state.h"
 #include "project/modes/modes.h"
@@ -20,13 +21,16 @@
 // A callsign adsbdb does not know is asked again after this long: routes
 // get added, and a flight number gets reused for a different route.
 #define ROUTE_RETRY_MS       (60UL * 60UL * 1000UL)
-#define HIGH_ALTITUDE_FT     10000
+// Climbing or descending at this rate or faster, ft/min; slower is level.
+#define CLIMB_FPM            300
 
 struct Flight {
   bool     valid = false;
   char     from[5] = "", to[5] = "";
   char     number[10] = "";
   char     aircraft[8] = "";
+  char     airline[4] = "";   // the callsign's ICAO prefix, "" for none
+  int8_t   climb = 0;         // 1 climbing, -1 descending, 0 level
   uint32_t speed = 0, altitude = 0;
 };
 
@@ -115,6 +119,7 @@ struct Nearest {
   char     callsign[10] = "";
   char     type[8] = "";
   int32_t  altitude = 0;
+  int32_t  rate = 0;          // ft/min, + climbing
   float    speed = 0;
 };
 
@@ -133,6 +138,7 @@ static void consider(JsonObjectConst a, void *ctx) {
   n.dst = d;
   n.altitude = alt;
   n.speed = a["gs"] | 0.0f;
+  n.rate = a["baro_rate"] | (a["geom_rate"] | 0);
   snprintf(n.callsign, sizeof(n.callsign), "%s", cs);
   snprintf(n.type, sizeof(n.type), "%s", a["t"] | "");
 }
@@ -148,6 +154,8 @@ static bool askFeed(const AdsbFeed &feed, float lat, float lon, Nearest &n,
   filter["gs"] = true;
   filter["t"] = true;
   filter["dst"] = true;
+  filter["baro_rate"] = true;
+  filter["geom_rate"] = true;
   GsHttp req;
   req.url = url;
   req.http11 = feed.http11;
@@ -175,6 +183,8 @@ static bool flightsFetch(char *err, size_t err_n) {
   trimRight(best.callsign);
   const Route *r = routeFor(best.callsign);
   s_next.valid = true;
+  airlinePrefix(best.callsign, s_next.airline);
+  s_next.climb = best.rate >= CLIMB_FPM ? 1 : best.rate <= -CLIMB_FPM ? -1 : 0;
   s_next.altitude = best.altitude;
   s_next.speed = (uint32_t)lroundf(best.speed);
   snprintf(s_next.aircraft, sizeof(s_next.aircraft), "%s", best.type);
@@ -186,6 +196,64 @@ static bool flightsFetch(char *err, size_t err_n) {
 
 // ---- drawing (loop task) ----------------------------------------------------
 
+// Each line its own colour, as the Unifi mode has them.
+static const uint16_t C_ROUTE  = rgb565(255, 120, 0);    // amber
+static const uint16_t C_NUMBER = rgb565(210, 210, 210);  // soft white
+static const uint16_t C_ALT    = rgb565(70, 160, 255);   // sky blue
+static const uint16_t C_SPEED  = rgb565(160, 90, 240);   // violet
+static const uint16_t C_TYPE   = rgb565(130, 130, 130);  // grey
+static const uint16_t C_UP     = rgb565(0, 210, 80);
+static const uint16_t C_DOWN   = rgb565(230, 30, 30);
+static const uint16_t C_PLANE  = rgb565(120, 120, 120);
+
+constexpr int16_t TEXT_X = AIRLINE_LOGO_SIZE + 2;   // right of the mark
+constexpr int16_t ARROW_W = 5, ARROW_H = 7;
+
+// An airline not on the list (or a light aircraft): a plane, from above.
+static const char *const PLANE_ART[AIRLINE_LOGO_SIZE] = {
+  "................",
+  ".......##.......",
+  "......####......",
+  "......####......",
+  "......####......",
+  ".....######.....",
+  "...##########...",
+  ".##############.",
+  "################",
+  "......####......",
+  "......####......",
+  "......####......",
+  ".....######.....",
+  "....########....",
+  "................",
+  "................",
+};
+
+static const char *const ARROW_UP[ARROW_H] = {
+  "..#..", ".###.", "#.#.#", "..#..", "..#..", "..#..", "..#..",
+};
+
+static void drawArt(int16_t x, int16_t y, const char *const *rows, int16_t w, int16_t h,
+                    uint16_t c, bool flip = false) {
+  GFXcanvas16 &cv = matrixCanvas();
+  for (int16_t j = 0; j < h; j++)
+    for (int16_t i = 0; i < w; i++)
+      if (rows[flip ? h - 1 - j : j][i] == '#') cv.drawPixel(x + i, y + j, c);
+}
+
+// The mark: the airline's own, or the plane.
+static void drawMark() {
+  const uint16_t *logo = airlineLogo(s_cur.airline);
+  if (logo) drawIcon(0, 0, AIRLINE_LOGO_SIZE, AIRLINE_LOGO_SIZE, logo);
+  else      drawArt(0, 0, PLANE_ART, AIRLINE_LOGO_SIZE, AIRLINE_LOGO_SIZE, C_PLANE);
+}
+
+// "38,000ft": the thousands set apart, as a pilot reads it out.
+static void altitudeText(uint32_t ft, char *out, size_t n) {
+  if (ft >= 1000) snprintf(out, n, "%u,%03uft", (unsigned)(ft / 1000), (unsigned)(ft % 1000));
+  else            snprintf(out, n, "%uft", (unsigned)ft);
+}
+
 static void draw() {
   GFXcanvas16 &c = matrixCanvas();
   c.fillScreen(0);
@@ -193,21 +261,29 @@ static void draw() {
   // which read as a plane that never moved.
   if (!s_cur.valid) return;
 
-  const uint16_t CYAN = rgb565(0, 255, 255), WHITE = rgb565(255, 255, 255);
+  drawMark();
   char line[24];
-  // A route adsbdb does not know: the callsign takes the first line too.
-  if (s_cur.from[0]) snprintf(line, sizeof(line), "%s>%s", s_cur.from, s_cur.to);
-  else               snprintf(line, sizeof(line), "%s", s_cur.number);
-  drawText(0, 0, line, CYAN);
-  drawText(0, 8, s_cur.number, WHITE);
-  snprintf(line, sizeof(line), "%uft", (unsigned)s_cur.altitude);
-  drawText(0, 16, line, s_cur.altitude > HIGH_ALTITUDE_FT ? rgb565(0, 255, 0) : rgb565(255, 0, 0));
-  c.setCursor(0, 24);
-  c.setTextColor(WHITE);
-  c.print(s_cur.speed);
-  c.print("kts");
-  c.setTextColor(CYAN);
-  c.print(s_cur.aircraft);
+  // A route adsbdb does not know: the flight number moves up to the top.
+  if (s_cur.from[0]) {
+    snprintf(line, sizeof(line), "%s>%s", s_cur.from, s_cur.to);
+    drawText(TEXT_X, 0, line, C_ROUTE);
+    drawText(TEXT_X, ROW_H, s_cur.number, C_NUMBER);
+  } else {
+    drawText(TEXT_X, 0, s_cur.number, C_NUMBER);
+  }
+
+  if (s_cur.climb) {
+    drawArt(0, 2 * ROW_H, ARROW_UP, ARROW_W, ARROW_H, s_cur.climb > 0 ? C_UP : C_DOWN,
+            s_cur.climb < 0);
+  } else {
+    c.drawFastHLine(0, 2 * ROW_H + 3, ARROW_W, C_TYPE);   // level
+  }
+  altitudeText(s_cur.altitude, line, sizeof(line));
+  drawText(ARROW_W + 2, 2 * ROW_H, line, C_ALT);
+
+  snprintf(line, sizeof(line), "%ukt", (unsigned)s_cur.speed);
+  drawText(0, 3 * ROW_H, line, C_SPEED);
+  drawRightAligned(MATRIX_W - 1, 3 * ROW_H, s_cur.aircraft, C_TYPE);
 }
 
 static void flightsEnter()  { draw(); }

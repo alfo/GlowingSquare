@@ -33,3 +33,4 @@
 # Re-excluded after the whitelist above.
 **/__pycache__/
 **/.DS_Store
+tools/.logo-cache/

@@ -4,7 +4,8 @@ A purpose-built display: a 64×32 LED matrix and an ESP32 in a wooden frame,
 showing one of three things:
 
 - **Tube / London Bus**: the next departures from your stop, from TfL.
-- **Flights**: the plane overhead right now, with its route, altitude and speed.
+- **Flights**: the plane overhead right now, with its airline's logo, route,
+  altitude and speed.
 - **Unifi**: your home network: monthly traffic, clients and guests, new
   arrivals, and a graph of the last five hours.
 
@@ -106,6 +107,11 @@ Find your stop's id with `https://api.tfl.gov.uk/StopPoint/Search/<name>`
 The latitude and longitude of the middle of the area to watch, and a radius in
 nautical miles. Coming from v1's `lat1,lat2,lon1,lon2` box? The Flights
 section has a converter.
+
+The logos are a curated list of about 55 airlines, the ones over London and
+Heathrow's regulars, each drawn to sit on black at 16x16. Any other aircraft
+shows a plain plane. To add an airline, add a row to
+`tools/gen_airline_logos.py` and run it again.
 
 ### Unifi
 

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "project/gs_http.h"
+#include "project/airline_logos.h"
 #include "project/body_blocks.h"
 #include "project/json_walk.h"
 #include "project/tfl_rename.h"
@@ -167,6 +168,34 @@ static bool rowHasColour(int y0, uint16_t c) {
   return false;
 }
 
+// The airline's mark exactly, top left.
+static bool markIs(const uint16_t *logo) {
+  for (int y = 0; y < AIRLINE_LOGO_SIZE; y++)
+    for (int x = 0; x < AIRLINE_LOGO_SIZE; x++)
+      if (px(x, y) != logo[y * AIRLINE_LOGO_SIZE + x]) return false;
+  return true;
+}
+
+// The callsign's prefix, and the curated list behind it.
+static void testAirlines() {
+  char p[4];
+  airlinePrefix("BAW136", p);  assert(strcmp(p, "BAW") == 0);
+  airlinePrefix("GKUBE", p);   assert(p[0] == '\0');   // a registration
+  airlinePrefix("N123AB", p);  assert(p[0] == '\0');
+  airlinePrefix("EZY8", p);    assert(strcmp(p, "EZY") == 0);
+  airlinePrefix("", p);        assert(p[0] == '\0');
+  assert(airlineLogo("BAW") && airlineLogo("SHT") == airlineLogo("BAW"));   // the Shuttle is BA
+  assert(airlineLogo("EJU") == airlineLogo("EZY"));
+  assert(airlineLogo("THA") && airlineLogo("THA") != airlineLogo("BAW"));
+  assert(!airlineLogo("XYZ") && !airlineLogo(""));
+  for (size_t i = 0; i < AIRLINE_LOGOS_N; i++) {
+    assert(strlen(AIRLINE_LOGOS[i].prefix) == 3);
+    bool lit = false;                                   // no mark is all black
+    for (int k = 0; k < AIRLINE_LOGO_SIZE * AIRLINE_LOGO_SIZE; k++) lit |= AIRLINE_LOGOS[i].img[k] != 0;
+    assert(lit);
+  }
+}
+
 static void runFor(const DisplayMode &m, uint32_t ms) {
   const uint32_t end = g_fake_ms + ms;
   while (g_fake_ms < end) { g_fake_ms += 5; m.frame(g_fake_ms); }
@@ -237,6 +266,7 @@ int main(int argc, char **argv) {
   testJsonWalk();
   testRename();
   testBodyBlocks();
+  testAirlines();
 
   // ---- Flights: central London ----
   snprintf(g_fl_lat, sizeof g_fl_lat, "51.5074");
@@ -246,8 +276,13 @@ int main(int argc, char **argv) {
   MODE_FLIGHTS_OPS.enter();
   fetchCommit(MODE_FLIGHTS_OPS);
   dump("flights");
-  assert(rowHasColour(0, rgb565(0, 255, 255)));        // LHR>BKK
-  assert(rowHasColour(16, rgb565(255, 0, 0)));         // 9050ft: below 10,000, red
+  assert(markIs(airlineLogo("THA")));                  // THA917: Thai's orchid
+  assert(rowHasColour(0, rgb565(255, 120, 0)));        // LHR>BKK, amber
+  assert(rowHasColour(8, rgb565(210, 210, 210)));      // TG917
+  assert(rowHasColour(16, rgb565(0, 210, 80)));        // climbing at 2,304 ft/min
+  assert(rowHasColour(16, rgb565(70, 160, 255)));      // 9,050ft
+  assert(rowHasColour(24, rgb565(160, 90, 240)));      // 276kt
+  assert(rowHasColour(24, rgb565(130, 130, 130)));     // B77W
 
   // adsb.lol down: the same flight from adsb.fi, which is then asked first.
   g_down = "api.adsb.lol";
@@ -256,7 +291,7 @@ int main(int argc, char **argv) {
   fetchCommit(MODE_FLIGHTS_OPS);
   assert(g_urls.size() >= 2 && g_urls[0].find("api.adsb.lol") != std::string::npos);
   assert(g_urls[1].find("opendata.adsb.fi/api/v2/lat/51.5074/lon/-0.1278/dist/10") != std::string::npos);
-  assert(rowHasColour(0, rgb565(0, 255, 255)));        // LHR>BKK again
+  assert(markIs(airlineLogo("THA")));                  // TG917 again
   g_urls.clear();
   fetchCommit(MODE_FLIGHTS_OPS);
   assert(g_urls[0].find("opendata.adsb.fi") != std::string::npos);
@@ -278,7 +313,7 @@ int main(int argc, char **argv) {
   fetchCommit(MODE_FLIGHTS_OPS);
   assert(g_urls.size() >= 2 && g_urls[0].find("api.adsb.lol") != std::string::npos);
   assert(g_urls[1].find("opendata.adsb.fi") != std::string::npos);
-  assert(rowHasColour(0, rgb565(0, 255, 255)));        // a flight, not a dark panel
+  assert(markIs(airlineLogo("THA")));                  // a flight, not a dark panel
   g_down = nullptr;
   g_down_code = -1;
 
