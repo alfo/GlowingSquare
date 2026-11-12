@@ -196,14 +196,18 @@ static bool flightsFetch(char *err, size_t err_n) {
 
 // ---- drawing (loop task) ----------------------------------------------------
 
-// Each line its own colour, as the Unifi mode has them.
+// Each line its own colour, as the Unifi mode has them, and saturated: the
+// panel shows a value as light, so a little of a second channel (sky blue,
+// violet) reads as washed out, not as a tint, and grey as a dim white. The
+// blue and purple are the Unifi mode's own.
 static const uint16_t C_ROUTE  = rgb565(255, 120, 0);    // amber
 static const uint16_t C_NUMBER = rgb565(210, 210, 210);  // soft white
-static const uint16_t C_ALT    = rgb565(70, 160, 255);   // sky blue
-static const uint16_t C_SPEED  = rgb565(160, 90, 240);   // violet
-static const uint16_t C_TYPE   = rgb565(130, 130, 130);  // grey
-static const uint16_t C_UP     = rgb565(0, 210, 80);
-static const uint16_t C_DOWN   = rgb565(230, 30, 30);
+static const uint16_t C_ALT    = rgb565(0, 220, 255);    // cyan
+static const uint16_t C_SPEED  = rgb565(21, 58, 234);    // Unifi's graph blue
+static const uint16_t C_TYPE   = rgb565(110, 10, 204);   // Unifi's upload purple
+static const uint16_t C_UP     = rgb565(0, 255, 0);
+static const uint16_t C_DOWN   = rgb565(255, 0, 0);
+static const uint16_t C_LEVEL  = rgb565(130, 130, 130);
 static const uint16_t C_PLANE  = rgb565(120, 120, 120);
 
 constexpr int16_t TEXT_X = AIRLINE_LOGO_SIZE + 2;   // right of the mark
@@ -276,7 +280,7 @@ static void draw() {
     drawArt(0, 2 * ROW_H, ARROW_UP, ARROW_W, ARROW_H, s_cur.climb > 0 ? C_UP : C_DOWN,
             s_cur.climb < 0);
   } else {
-    c.drawFastHLine(0, 2 * ROW_H + 3, ARROW_W, C_TYPE);   // level
+    c.drawFastHLine(0, 2 * ROW_H + 3, ARROW_W, C_LEVEL);
   }
   altitudeText(s_cur.altitude, line, sizeof(line));
   drawText(ARROW_W + 2, 2 * ROW_H, line, C_ALT);

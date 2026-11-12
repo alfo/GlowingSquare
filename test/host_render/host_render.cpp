@@ -279,10 +279,10 @@ int main(int argc, char **argv) {
   assert(markIs(airlineLogo("THA")));                  // THA917: Thai's orchid
   assert(rowHasColour(0, rgb565(255, 120, 0)));        // LHR>BKK, amber
   assert(rowHasColour(8, rgb565(210, 210, 210)));      // TG917
-  assert(rowHasColour(16, rgb565(0, 210, 80)));        // climbing at 2,304 ft/min
-  assert(rowHasColour(16, rgb565(70, 160, 255)));      // 9,050ft
-  assert(rowHasColour(24, rgb565(160, 90, 240)));      // 276kt
-  assert(rowHasColour(24, rgb565(130, 130, 130)));     // B77W
+  assert(rowHasColour(16, rgb565(0, 255, 0)));         // climbing at 2,304 ft/min
+  assert(rowHasColour(16, rgb565(0, 220, 255)));       // 9,050ft, cyan
+  assert(rowHasColour(24, rgb565(21, 58, 234)));       // 276kt, Unifi's blue
+  assert(rowHasColour(24, rgb565(110, 10, 204)));      // B77W, Unifi's purple
 
   // adsb.lol down: the same flight from adsb.fi, which is then asked first.
   g_down = "api.adsb.lol";

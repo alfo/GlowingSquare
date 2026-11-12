@@ -33,6 +33,7 @@ out_cpp = root / "src/project/airline_logos.cpp"
 SIZE = 16          # the mark's side on the panel, in pixels
 SOURCE = 64        # the size asked of pics.avs.io
 MIN_ALPHA = 0.2    # less of the mark than this is the ground showing through
+GAMMA = 2.2        # the logos' colours are for a screen; the panel is linear
 URL = "https://pics.avs.io/al_square/{n}/{n}/{iata}.png"
 
 # Drawn here, for marks that do not survive 16 px: BA's speedmarque is a
@@ -225,10 +226,18 @@ def drawn(art):
     return out
 
 
+def led(im):
+    """Screen colours to the panel's. The panel lights an LED for as long as
+    its value says, so a value is light, not a screen's gamma-encoded level:
+    BA's red (235, 34, 38) lit its green and blue a sixth of the time and
+    read as pink. Through the gamma it is (214, 3, 4), red."""
+    return im.point(lambda v: int(round(255 * (v / 255) ** GAMMA)))
+
+
 def mark(iata, opts):
-    """The logo as a 16x16 RGB image on black."""
+    """The logo as a 16x16 RGB image on black, in the panel's colours."""
     if "art" in opts:
-        return drawn(opts["art"])
+        return led(drawn(opts["art"]))
     src = fetch(iata)
     if "crop" in opts:
         bg_src = src
@@ -271,7 +280,7 @@ def mark(iata, opts):
     # and a dark red or navy mark all but vanished beside the others.
     peak = max(max(p) for p in out.getdata()) or 1
     k = 255 / peak
-    return out.point(lambda v: min(255, int(v * k)))
+    return led(out.point(lambda v: min(255, int(v * k))))
 
 
 def rgb565(c):
