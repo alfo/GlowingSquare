@@ -258,24 +258,38 @@ static const char APP_CSS[] PROGMEM =
       // control on the right. Close to .row/.k/.v, which carries a label and a
       // value - but a setting needs a second line under the name, and .row has
       // nowhere to put one.
-      ".orow{display:flex;justify-content:space-between;align-items:flex-start;"
-      "gap:16px;padding:12px 0;border-bottom:1px solid var(--line-soft)}"
-      ".orow:last-child{border-bottom:0;padding-bottom:0}"
-      // A row with a field rather than a switch: the field gets the room.
-      ".orow.ow{flex-wrap:wrap}.orow.ow .ov{flex:1 1 320px;justify-content:flex-end}"
-      ".orow.ow .ov .inrow{width:100%;justify-content:flex-end}"
+      //
+      // Each row sits in a .orw with its help text, so the rule between rows
+      // belongs to the .orw: on the .orow, every row was its wrapper's first
+      // and last child, and the rules and spacing came and went with the help
+      // text. The name column has one width, so every field starts at the
+      // same place and a "?" beside a name no longer pushes its field over.
+      ".orw{border-bottom:1px solid var(--line-soft)}.orw:last-child{border-bottom:0}"
+      ".orow{display:flex;justify-content:space-between;align-items:center;"
+      "flex-wrap:wrap;gap:10px 16px;padding:12px 0}"
+      ".orw:first-child>.orow{padding-top:0}.orw:last-child>.orow{padding-bottom:0}"
+      ".orow.otall{align-items:flex-start}"
+      // A row with a field rather than a switch: the field gets the room, from
+      // the name column to the Save button at the right edge.
+      ".orow.ow .ov{flex:1 1 300px}"
+      ".orow.ow .ov .inrow{width:100%;flex-wrap:nowrap}"
+      ".orow.ow .ov .inrow>button:first-of-type{margin-left:auto}"
       ".orow.ow .ov input[type=text],.orow.ow .ov input[type=password],.orow.ow .ov textarea{flex:1 1 200px}"
-      ".srows{display:flex;flex-direction:column}"
-      ".orow:first-child{padding-top:0}"
-      ".ol{display:flex;flex-direction:column;gap:3px;min-width:0}"
+      ".orow.ow .ov select{flex:0 1 auto;max-width:100%}"
+      ".srows{display:flex;flex-direction:column}.card>.hint+.srows{margin-top:14px}"
+      // Markup a section adds after its rows starts below a rule of its own.
+      ".card>.srows:not(:last-child){padding-bottom:16px;border-bottom:1px solid var(--line-soft)}"
+      ".ol{flex:0 1 13em;display:flex;flex-direction:column;gap:3px;min-width:0}"
+      ".olh{display:flex;align-items:center;gap:8px}"
       ".on{font-size:14px;color:var(--ink-2)}"
       // Quiet text goes on --ink-soft. --ink-4 is a shape colour for rules and
       // inactive bars; as text on a card it is 1.7:1 and invisible.
       ".os{font-size:12px;color:var(--ink-soft);line-height:1.45}"
-      ".ov{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding-top:2px}"
+      ".ov{flex:0 0 auto;display:flex;align-items:center;gap:10px}"
       // The help circle the device shows as a "?" next to the row. Same idea
-      // here, and it opens the same text - as a line under the row rather than
-      // a modal, because a page has room and a 480px panel does not.
+      // here, beside the name, and it opens the same text - as a line under
+      // the row rather than a modal, because a page has room and a 480px
+      // panel does not.
       ".oq{flex:0 0 22px;width:22px;height:22px;padding:0;border-radius:50%;"
       "font-size:12px;line-height:1;display:flex;align-items:center;"
       "justify-content:center}"

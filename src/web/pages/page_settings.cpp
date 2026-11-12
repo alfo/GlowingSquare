@@ -212,14 +212,14 @@ static String body() {
          "return f;}"
          // A submenu row is the device's business.
          "return el('span','od',M.dev);}"
-         "function row(d){const wrap=el('div'),r=el('div','orow'),l=el('div','ol');"
-         "l.appendChild(el('span','on',d.name));if(d.sub)l.appendChild(el('span','os',d.sub));"
-         "r.appendChild(l);const v=el('div','ov');"
-         "const wide=d.kind==='text'||d.kind==='secret'||d.kind==='int';"
-         "if(wide){r.className='orow ow';}v.appendChild(ctl(d));r.appendChild(v);wrap.appendChild(r);"
+         "function row(d){const wrap=el('div','orw'),r=el('div','orow'),l=el('div','ol'),"
+         "h=el('div','olh');h.appendChild(el('span','on',d.name));l.appendChild(h);"
+         "if(d.sub)l.appendChild(el('span','os',d.sub));r.appendChild(l);const v=el('div','ov');"
+         "if(['text','secret','int','enum'].indexOf(d.kind)>=0)r.classList.add('ow');"
+         "if(d.multi)r.classList.add('otall');v.appendChild(ctl(d));r.appendChild(v);wrap.appendChild(r);"
          "if(d.info){const q=el('button','quiet oq','?'),p=el('p','oi',d.info);"
          "q.addEventListener('click',()=>p.classList.toggle('open'));"
-         "v.insertBefore(q,v.firstChild);wrap.appendChild(p);}"
+         "h.appendChild(q);wrap.appendChild(p);}"
          "return wrap;}"
          // A section that stops applying (a mode switch hid it) is reloaded
          // rather than left standing: the page asks again for the whole set.
