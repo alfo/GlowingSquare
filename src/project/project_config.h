@@ -3,7 +3,7 @@
 // Glowing Square 2: what the core prints, advertises and fetches under our
 // name. See app_config.h for every macro and its default.
 
-#define FW_VERSION        "v2.0.0-beta.10"
+#define FW_VERSION        "v2.0.0"
 
 #define APP_NAME          "Glowing Square"
 #define APP_NAME_MAIN     "Glowing"
