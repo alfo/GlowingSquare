@@ -434,6 +434,7 @@ static void otaBar(int16_t filled) {
 }
 
 void otaUiShow() {
+  fetchHold(true);
   if (!s_matrix_ok || s_ota_shown) return;
   s_ota_shown  = true;
   s_ota_filled = -1;
@@ -454,6 +455,7 @@ void otaUiStatus(const char *text) {
 }
 
 void otaUiHide() {
+  fetchHold(false);
   if (!s_ota_shown) return;
   s_ota_shown = false;
   if (s_ota_held) matrixHold(-1);

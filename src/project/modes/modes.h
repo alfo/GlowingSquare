@@ -37,6 +37,9 @@ const DisplayMode &modeOps(uint8_t mode);
 // From the loop. True when a fetch's answer was committed: the mode has
 // drawn it on the canvas, and the canvas must go to the panel.
 bool fetchTick();
+// While firmware is written: no fetch starts and none is committed, so the
+// update has the CPU and the progress line is not drawn over. Loop task.
+void fetchHold(bool hold);
 void fetchNow();              // the next pass fetches, whatever the interval
 bool fetchBusy();             // a fetch is running or waiting to be collected
 bool fetchOffline();          // three failures in a row: the red dot

@@ -16,7 +16,12 @@
 #include "web/web_jobs.h"
 
 #define FETCH_STACK_BYTES   12288
-#define FETCH_PRIORITY      1
+// The idle task's own priority. Above it, a fetch that is all CPU for a
+// while (a TLS handshake, stretched by the stalls of a firmware write) kept
+// core 0's idle task from running for the 5 s the task watchdog allows, and
+// the Flight display restarted in the middle of every upload (12.11.2026).
+// At this level the two share the core.
+#define FETCH_PRIORITY      tskIDLE_PRIORITY
 #define FETCH_CORE          0
 #define FAILS_FOR_OFFLINE   3
 
@@ -84,7 +89,12 @@ static bool collect() {
   return false;
 }
 
+static bool s_hold = false;   // loop task only
+
+void fetchHold(bool hold) { s_hold = hold; }
+
 bool fetchTick() {
+  if (s_hold) return false;
   // Failures belong to a mode: switching starts the count again.
   static uint8_t s_counted_mode = 255;
   if (s_counted_mode != g_mode) {
