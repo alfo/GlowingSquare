@@ -1,6 +1,6 @@
 {
   "name": "Glowing Square (ESP32 + HUB75 (DMA))",
-  "version": "v2.0.0-beta.10",
+  "version": "v2.0.0",
   "new_install_prompt_erase": true,
   "builds": [
     {

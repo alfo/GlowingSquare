@@ -1,23 +1,35 @@
 {
   "envs": {
     "gs-mini32-pxmatrix": {
-      "prerelease": "v2.0.0-beta.10",
-      "prerelease_sha256": "ff44c74937060706083c313ef6e4046861d7317905197a54650febc6921f917d",
-      "prerelease_size": 1651328
+      "prerelease": "v2.0.0",
+      "prerelease_sha256": "8b94b8397556895b84ac0b12cb1e914d7df2531740ea9d70955eedbdd25e0303",
+      "prerelease_size": 1651360,
+      "stable": "v2.0.0",
+      "stable_sha256": "8b94b8397556895b84ac0b12cb1e914d7df2531740ea9d70955eedbdd25e0303",
+      "stable_size": 1651360
     },
     "gs-esp32-dma": {
-      "prerelease": "v2.0.0-beta.10",
-      "prerelease_sha256": "6587f8aae87e62fa65eb6367a326850c65975ea07452483c54977cc64fbd3cb5",
-      "prerelease_size": 1640416
+      "prerelease": "v2.0.0",
+      "prerelease_sha256": "92ce633d510f2706f7adcf73945abfd0295bb2c8b8fcb718322efe898d5f3907",
+      "prerelease_size": 1640448,
+      "stable": "v2.0.0",
+      "stable_sha256": "92ce633d510f2706f7adcf73945abfd0295bb2c8b8fcb718322efe898d5f3907",
+      "stable_size": 1640448
     },
     "gs-s3-dma": {
-      "prerelease": "v2.0.0-beta.10",
-      "prerelease_sha256": "7d8513682aee6062d5d32421e1a292c0424120ee68c5dedb08dd3403827567f0",
-      "prerelease_size": 1610704
+      "prerelease": "v2.0.0",
+      "prerelease_sha256": "72220587dc05f27fee47d5125ae68d5d82e8b3af347f21837f6a3e75f41579c0",
+      "prerelease_size": 1610736,
+      "stable": "v2.0.0",
+      "stable_sha256": "72220587dc05f27fee47d5125ae68d5d82e8b3af347f21837f6a3e75f41579c0",
+      "stable_size": 1610736
     }
   },
   "url": "https://github.com/alfo/GlowingSquare/releases/latest",
-  "prerelease": "v2.0.0-beta.10",
-  "prerelease_sha256": "ff44c74937060706083c313ef6e4046861d7317905197a54650febc6921f917d",
-  "prerelease_size": 1651328
+  "prerelease": "v2.0.0",
+  "prerelease_sha256": "8b94b8397556895b84ac0b12cb1e914d7df2531740ea9d70955eedbdd25e0303",
+  "prerelease_size": 1651360,
+  "stable": "v2.0.0",
+  "stable_sha256": "8b94b8397556895b84ac0b12cb1e914d7df2531740ea9d70955eedbdd25e0303",
+  "stable_size": 1651360
 }
