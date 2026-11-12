@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <title>Share Location</title>
+  <!-- Opened by the device's own web interface (locateOnce() in app.js).
+       A browser gives a position only to a secure page and the device serves
+       plain HTTP, so this page, on HTTPS, asks instead and posts the answer
+       back to the window that opened it. Nothing is sent anywhere else, and
+       nothing is stored. -->
+  <style>
+    :root {
+      --ground: #06080f; --surface: #0c1828; --line: #1a3060;
+      --ink: #e8f0ff; --ink-soft: #6d8cb8; --accent: var(--accent-d, #4cc2ff); --bad: #ff6b6b;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --ground: #eef3f9; --surface: #ffffff; --line: #b9c8dd;
+        --ink: #0f1a2a; --ink-soft: #50627c; --accent: var(--accent-l, #0a6fb0); --bad: #b3261e;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--ground); color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 24px 16px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 32px 24px; max-width: 420px; width: 100%; text-align: center;
+    }
+    .logo { width: 64px; height: 64px; margin: 0 auto 12px; }
+    h1 { font-size: 22px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+    p { color: var(--ink-soft); font-size: 14px; line-height: 1.55; margin-bottom: 20px; }
+    b { color: var(--ink); font-weight: 600; word-break: break-all; }
+    button {
+      width: 100%; padding: 14px 24px; font: inherit; font-size: 16px; font-weight: 600;
+      cursor: pointer; border-radius: 10px; border: 1px solid var(--accent);
+      background: var(--accent); color: var(--on-accent, #fff);
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    #msg { margin: 16px 0 0; min-height: 1.5em; }
+    #msg.bad { color: var(--bad); }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="logo.svg" alt="">
+    <h1 id="app">Share Location</h1>
+    <p id="what"></p>
+    <button id="go" hidden>Share my location</button>
+    <p id="msg" role="status"></p>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+
+    // Only a device on the local network may ask: a private address, a
+    // .local name or this computer. Anything else could be a website that
+    // opened this page to learn where its visitor is.
+    function localOrigin(o) {
+      let u;
+      try { u = new URL(o); } catch (e) { return null; }
+      if (u.origin !== o || (u.protocol !== 'http:' && u.protocol !== 'https:')) return null;
+      const h = u.hostname;
+      if (h === 'localhost' || h.endsWith('.local')) return u;
+      const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(h);
+      if (!m) return null;
+      const a = +m[1], b = +m[2];
+      const priv = a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) ||
+                   (a === 192 && b === 168) || (a === 169 && b === 254);
+      return priv ? u : null;
+    }
+
+    function say(t, bad) { $('msg').textContent = t; $('msg').className = bad ? 'bad' : ''; }
+
+    const from = new URLSearchParams(location.search).get('from') || '';
+    const dev = localOrigin(from);
+    const opener = window.opener;
+
+    function reply(data) {
+      try { opener.postMessage(Object.assign({ type: 'locate' }, data), from); } catch (e) {}
+    }
+
+    if (!dev || !opener) {
+      $('what').textContent = 'Open this page with the "Use my location" button on your device\'s Settings page.';
+    } else {
+      $('what').innerHTML = 'Your device at <b></b> asks for this computer\'s location, once. ' +
+                            'It goes straight to the device and nowhere else.';
+      $('what').querySelector('b').textContent = dev.host;
+      $('go').hidden = false;
+      // Asked on a click every time, never on load: the browser remembers the
+      // permission for this site, and the device named above should be seen.
+      $('go').addEventListener('click', () => {
+        if (!navigator.geolocation) { say('This browser cannot tell where it is.', true); reply({ err: 'none' }); return; }
+        $('go').disabled = true;
+        say('Asking the browser...');
+        navigator.geolocation.getCurrentPosition(p => {
+          reply({ lat: p.coords.latitude, lon: p.coords.longitude });
+          say('Sent. This window closes by itself.');
+        }, e => {
+          const denied = e && e.code === 1;
+          say(denied ? 'Location was not allowed. Allow it for this site and try again.'
+                     : 'The browser could not find a location.', true);
+          reply({ err: denied ? 'denied' : 'none' });
+          $('go').disabled = false;
+        }, { timeout: 20000, maximumAge: 600000 });
+      });
+    }
+
+    // The project's name and colours, the same file the flasher reads.
+    fetch('boards.json', { cache: 'no-store' }).then(r => r.json()).then(d => {
+      if (d.app) { $('app').textContent = d.app; document.title = d.app + ' - Share Location'; }
+      const a = d.accent || {}, r = document.documentElement.style;
+      if (a.dark) r.setProperty('--accent-d', a.dark);
+      if (a.light) r.setProperty('--accent-l', a.light);
+      const light = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches;
+      const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec((light ? a.light : a.dark) || '');
+      if (m) {
+        const lum = (0.299 * parseInt(m[1], 16) + 0.587 * parseInt(m[2], 16) + 0.114 * parseInt(m[3], 16)) / 255;
+        r.setProperty('--on-accent', lum > 0.6 ? '#0b0f0d' : '#ffffff');
+      }
+    }).catch(() => {});
+  </script>
+</body>
+</html>
