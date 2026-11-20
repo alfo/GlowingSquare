@@ -36,9 +36,11 @@ sources = [
     root / "src/project/gs_state.cpp",
     root / "src/project/modes/mode_table.cpp",
     root / "src/project/modes/mode_tube.cpp",
+    root / "src/project/modes/aviation.cpp",
     root / "src/project/modes/mode_flights.cpp",
     root / "src/project/airline_logos.cpp",
     root / "src/project/modes/mode_unifi.cpp",
+    root / "src/project/modes/mode_airport.cpp",
 ]
 
 with tempfile.TemporaryDirectory() as tmp:

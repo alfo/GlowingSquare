@@ -6,3 +6,4 @@
 const char *gsWebExtraTube();
 const char *gsWebExtraFlights();
 const char *gsWebExtraUnifi();
+const char *gsWebExtraAirport();

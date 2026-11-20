@@ -30,6 +30,7 @@ struct DisplayMode {
 extern const DisplayMode MODE_TUBE_OPS;
 extern const DisplayMode MODE_FLIGHTS_OPS;
 extern const DisplayMode MODE_UNIFI_OPS;
+extern const DisplayMode MODE_AIRPORT_OPS;
 
 const DisplayMode &modeOps(uint8_t mode);
 

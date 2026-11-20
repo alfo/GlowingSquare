@@ -1,26 +1,30 @@
 # Glowing Square
 
 A purpose-built display: a 64×32 LED matrix and an ESP32 in a wooden frame,
-showing one of three things:
+showing one of four things:
 
 - **Tube / London Bus**: the next departures from your stop, from TfL.
 - **Flights**: the plane overhead right now, with its airline's logo, route,
   altitude and speed.
 - **Unifi**: your home network: monthly traffic, clients and guests, new
   arrivals, and a graph of the last five hours.
+- **Airport**: the planes landing at and leaving one airport, each drawn
+  against the glide path at its real height, with the heights it flew
+  behind it and its altitude.
 
 ![Photo](https://i.imgur.com/ZX31npw.jpg)
 
 Full photo album [here](https://imgur.com/a/xTvUx8F).
 
-| Tube | Flights | Unifi |
-|---|---|---|
-| ![Tube](docs/previews/tube_settled.png) | ![Flights](docs/previews/flights.png) | ![Unifi](docs/previews/unifi_start.png) |
+| Tube | Flights | Unifi | Airport |
+|---|---|---|---|
+| ![Tube](docs/previews/tube_settled.png) | ![Flights](docs/previews/flights.png) | ![Unifi](docs/previews/unifi_start.png) | ![Airport](docs/previews/airport.png) |
 
 <sub>Rendered by `test/test_render.py` from real TfL and adsb.lol answers.</sub>
 
-**Glowing Square 2** is one firmware for all three: you pick the mode in the
-web interface, and each mode keeps the layout it had as its own sketch in 2020.
+**Glowing Square 2** is one firmware for all of them: you pick the mode in the
+web interface, and the three from 2020 keep the layout each had as its own
+sketch.
 The v1 sketches are kept under the [`v1-legacy`](../../tree/v1-legacy) tag.
 
 ## What's new in 2
@@ -112,6 +116,21 @@ The logos are a curated list of about 55 airlines, the ones over London and
 Heathrow's regulars, each drawn to sit on black at 16x16. Any other aircraft
 shows a plain plane. To add an airline, add a row to
 `tools/gen_airline_logos.py` and run it again.
+
+### Airport
+
+The airport's IATA or ICAO code (`LHR`, `EGLL`). London's six airports fill
+in their own position; for any other, set its latitude and longitude too.
+**Show** picks the plane when several are near: the one nearest the runway,
+landing or leaving; the next to land; or the next to land and the last to
+leave in turn. **Other end** names where it comes from or goes to by city
+(long names scroll) or by airport code.
+
+Which planes are landing or leaving comes from adsbdb's routes. A callsign
+broadcast with leading zeros (`AMX008`) is looked up without them as well
+(`AMX8`), as adsbdb files it. A plane it has no route for (BA's shuttles,
+often) is judged by how it flies: coming down near the glide path within
+10 nm, or climbing away low.
 
 ### Unifi
 
