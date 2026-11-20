@@ -401,7 +401,7 @@ int main(int argc, char **argv) {
   // BAW249 at 5.4 nm climbing out for Rio, TAP1366 at 8.6 nm in from Lisbon.
   {
     const uint16_t C_PLACE = rgb565(255, 120, 0), C_RUNWAY = rgb565(160, 160, 160);
-    const uint16_t C_PLANE = rgb565(255, 255, 255), C_NUMBER = rgb565(210, 210, 210);
+    const uint16_t C_PLANE = rgb565(255, 255, 255), C_NUMBER = rgb565(0, 255, 60);
     auto planeOnChart = [&]() {
       for (int y = 16; y < MATRIX_H; y++) for (int x = 0; x < MATRIX_W; x++) if (px(x, y) == C_PLANE) return true;
       return false;
