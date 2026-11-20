@@ -8,8 +8,9 @@ showing one of four things:
   altitude and speed.
 - **Unifi**: your home network: monthly traffic, clients and guests, new
   arrivals, and a graph of the last five hours.
-- **Airport**: the planes landing at and leaving one airport, each drawn on
-  its way down the glide path or up from the runway, with its trail.
+- **Airport**: the planes landing at and leaving one airport, each drawn
+  against the glide path at its real height, with the heights it flew
+  behind it and its altitude.
 
 ![Photo](https://i.imgur.com/ZX31npw.jpg)
 
@@ -125,9 +126,11 @@ landing or leaving; the next to land; or the next to land and the last to
 leave in turn. **Other end** names where it comes from or goes to by city
 (long names scroll) or by airport code.
 
-Which planes are landing or leaving comes from adsbdb's routes. A plane it
-has no route for (BA's shuttles, often) is judged by how it flies: coming
-down near the glide path within 10 nm, or climbing away low.
+Which planes are landing or leaving comes from adsbdb's routes. A callsign
+broadcast with leading zeros (`AMX008`) is looked up without them as well
+(`AMX8`), as adsbdb files it. A plane it has no route for (BA's shuttles,
+often) is judged by how it flies: coming down near the glide path within
+10 nm, or climbing away low.
 
 ### Unifi
 

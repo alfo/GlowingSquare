@@ -4,14 +4,21 @@
 // leaving from here), all free, no key.
 //
 // Layout:
-//   [mark]  flight number          the airline's mark, 16x16 (aviation.h)
-//   [mark]  the other end          its city (scrolling) or its code
-//   rows 16..31: a side view, distance across and height up. An arrival
-//   comes down from the left to the runway at the right; a departure
-//   climbs away from the runway at the left. The 3 degree glide path is
-//   dotted in, the plane is a bright 2x2 with its trail behind it (one dot
-//   a fetch), and between fetches it moves on at its own speed and rate of
-//   climb or descent.
+//   flight number          [mark]  the airline's mark, 16x16 (aviation.h)
+//   the other end          [mark]  its city (scrolling) or its code
+//   rows 16..31: a side view, distance across and height up. The 3 degree
+//   glide path is a dot every 4 px, each exactly 1 px lower: a pattern the
+//   grid can draw evenly, where a line at the true slope came out steppy.
+//   Height is on the path's own scale, so the path is the true glide path.
+//   Ahead of the plane the path is dim; the plane is a bright 2x2 at its
+//   real height; behind it an amber dot every 2 px at the height it flew
+//   there, so a plane that came in level shows a flat run meeting the
+//   path. An arrival comes down from the left to the runway at the right;
+//   a departure climbs away from the runway at the left. Between fetches
+//   the plane moves on at its own speed and rate of climb or descent.
+//   Its altitude is in the chart's corner, in the 3x5 font: bottom left
+//   while landing, where the path starts high; bottom right while leaving,
+//   away from the runway.
 //
 // Nothing near: the airport's code where the flight number goes, and the
 // path and runway with no plane.
@@ -25,6 +32,7 @@
 #include "project/modes/aviation.h"
 #include "project/modes/modes.h"
 #include "project/render.h"
+#include <Fonts/TomThumb.h>
 
 #define AIRPORT_RADIUS_NM    15
 // Above this a plane is passing over, not landing or leaving: Heathrow's
@@ -34,7 +42,7 @@
 // adsbdb lookups one fetch may start, a TLS handshake each; the rest wait
 // for the next fetch, the cache answering for the ones already seen.
 #define NEW_ROUTES_PER_FETCH 2
-#define TRAIL_N              16
+#define TRAIL_N              32        // 10 s apart: some 13 nm at 150 kt
 // A plane adsbdb has no route for (BA's shuttles, often) is judged by how it
 // flies: coming down within GUESS_NM and no more than GUESS_PATH_FT above
 // the glide path is landing here; climbing away below GUESS_DEP_FT within
@@ -45,7 +53,6 @@
 #define GUESS_DEP_FT         5000
 #define CLIMB_FPM            300
 #define CHART_NM             12.0f     // across the panel
-#define CHART_FT             4000.0f   // up the chart
 #define GLIDE_FT_PER_NM      318.0f    // a 3 degree path
 #define ALTERNATE_MS         8000UL
 #define FRAME_MS             100UL
@@ -222,16 +229,22 @@ static bool airportFetch(char *err, size_t err_n) {
 
 static const uint16_t C_NUMBER = rgb565(210, 210, 210);
 static const uint16_t C_PLACE  = rgb565(255, 120, 0);
-static const uint16_t C_PATH   = rgb565(45, 45, 45);
+static const uint16_t C_PATH   = rgb565(40, 40, 40);
+static const uint16_t C_FLOWN  = rgb565(255, 120, 0);   // the place's amber
 static const uint16_t C_RUNWAY = rgb565(160, 160, 160);
 static const uint16_t C_PLANE  = rgb565(255, 255, 255);
-static const uint8_t  TRAIL_G = 220, TRAIL_B = 255;   // cyan, fading with age
 
-constexpr int16_t TEXT_X = AIRLINE_LOGO_SIZE + 2;     // right of the mark
+constexpr int16_t MARK_X = MATRIX_W - AIRLINE_LOGO_SIZE;   // the mark, top right
+constexpr int16_t TEXT_W = MARK_X - 2;                // the text, left of it
+constexpr int16_t ALT_STEP_FT = 25;                   // ADS-B's own step
+static const uint16_t C_ALT = rgb565(0, 220, 255);    // Flights' altitude cyan
 constexpr int16_t CHART_TOP = 2 * ROW_H;
-constexpr int16_t CHART_H = MATRIX_H - CHART_TOP;
-constexpr int16_t RUNWAY_W = 9;
-constexpr int16_t PATH_STEP = 3;                      // a dot every third pixel
+constexpr int16_t PATH_DOTS = MATRIX_H - CHART_TOP;   // one a row: 16
+constexpr int16_t PATH_DX = 4;                        // apart, one row lower each
+constexpr int16_t CHART_X_MAX = PATH_DX * (PATH_DOTS - 1);   // the far end: 60
+constexpr float   FT_PER_PX = GLIDE_FT_PER_NM * CHART_NM / (PATH_DOTS - 1);
+constexpr int16_t FLOWN_DX = 2;                       // a dot every 2 px behind
+constexpr int16_t RUNWAY_W = 6;
 
 static uint32_t s_commit_ms = 0;   // when s_cur arrived
 static bool     s_alt_dep = false; // alternating: the departure's turn
@@ -242,12 +255,18 @@ static uint32_t s_drawn_key = 0;   // what the last draw showed, to skip the sam
 
 static int16_t chartX(float nm, bool arrival) {
   const float frac = fminf(fmaxf(nm, 0), CHART_NM) / CHART_NM;
-  return (int16_t)lroundf((arrival ? 1 - frac : frac) * (MATRIX_W - 1));
+  return (int16_t)lroundf((arrival ? 1 - frac : frac) * CHART_X_MAX);
+}
+
+// The distance at column x: chartX() the other way.
+static float chartNm(int16_t x, bool arrival) {
+  const float frac = (float)x / CHART_X_MAX;
+  return (arrival ? 1 - frac : frac) * CHART_NM;
 }
 
 static int16_t chartY(float ft) {
-  const float frac = fminf(fmaxf(ft, 0), CHART_FT) / CHART_FT;
-  return (int16_t)(MATRIX_H - 1 - lroundf(frac * (CHART_H - 2)));
+  const int16_t y = (int16_t)(MATRIX_H - 1 - lroundf(fmaxf(ft, 0) / FT_PER_PX));
+  return y < CHART_TOP ? CHART_TOP : y;
 }
 
 // The plane where it is now: its last position, moved on at its speed and
@@ -270,30 +289,75 @@ static const Movement *shown() {
   return a->dst <= d->dst ? a : d;   // nearest the runway
 }
 
+// The height flown at `nm`, between the two positions either side of it:
+// the trail, oldest first, then where the plane is now. False when it was
+// never seen there.
+static bool flownAt(const Movement &m, float now_nm, float now_ft, float nm, float &ft) {
+  for (uint8_t i = 0; i < m.trail_n; i++) {
+    const float d0 = m.trail_dst[i], f0 = m.trail_alt[i];
+    const bool last = i + 1 == m.trail_n;
+    const float d1 = last ? now_nm : m.trail_dst[i + 1];
+    const float f1 = last ? now_ft : m.trail_alt[i + 1];
+    if (d0 == d1 || nm < fminf(d0, d1) || nm > fmaxf(d0, d1)) continue;
+    ft = f0 + (f1 - f0) * (nm - d0) / (d1 - d0);
+    return true;
+  }
+  return false;
+}
+
+// Path dot k: 4k across, one row lower each towards the runway.
+static int16_t pathY(int16_t k, bool arrival) {
+  return arrival ? CHART_TOP + k : MATRIX_H - 1 - k;
+}
+
+// "1,575ft", to ALT_STEP_FT.
+static void altitudeText(float ft, char *out, size_t n) {
+  const unsigned a = (unsigned)(lroundf(ft / ALT_STEP_FT) * ALT_STEP_FT);
+  if (a >= 1000) snprintf(out, n, "%u,%03uft", a / 1000, a % 1000);
+  else           snprintf(out, n, "%uft", a);
+}
+
+// In the 3x5 font on the chart's bottom row: left while landing, right
+// while leaving. First, so the plane passes over it if they ever meet.
+static void drawAltitude(float ft, bool arrival) {
+  GFXcanvas16 &c = matrixCanvas();
+  char text[12];
+  altitudeText(ft, text, sizeof(text));
+  c.setFont(&TomThumb);
+  int16_t bx, by;
+  uint16_t bw, bh;
+  c.getTextBounds(text, 0, MATRIX_H - 1, &bx, &by, &bw, &bh);
+  c.setCursor(arrival ? 0 : MATRIX_W - (int16_t)bw, MATRIX_H - 1);
+  c.setTextColor(C_ALT);
+  c.print(text);
+  c.setFont(nullptr);
+}
+
 static void drawChart(const Movement *m, bool arrival, uint32_t now) {
   GFXcanvas16 &c = matrixCanvas();
+  float nm = 0, ft = 0;
+  if (m) glidePosition(*m, now, nm, ft);
+  if (m) drawAltitude(ft, arrival);
+  // Both ways the plane flies left to right: behind it is x < px.
+  const int16_t px = m ? chartX(nm, arrival) : -1;
+  for (int16_t k = 0; k < PATH_DOTS; k++)
+    if (PATH_DX * k > px) c.drawPixel(PATH_DX * k, pathY(k, arrival), C_PATH);
+  if (m) {
+    for (int16_t x = 0; x < px; x += FLOWN_DX) {
+      float f;
+      if (flownAt(*m, nm, ft, chartNm(x, arrival), f)) c.drawPixel(x, chartY(f), C_FLOWN);
+      else if (x % PATH_DX == 0) c.drawPixel(x, pathY(x / PATH_DX, arrival), C_PATH);
+    }
+  }
+  // After the path, whose end dot lands on it; the plane, landing, on top.
   c.drawFastHLine(arrival ? MATRIX_W - RUNWAY_W : 0, MATRIX_H - 1, RUNWAY_W, C_RUNWAY);
-  for (int16_t k = 0; k < MATRIX_W; k += PATH_STEP) {
-    const float nm = (arrival ? MATRIX_W - 1 - k : k) * CHART_NM / (MATRIX_W - 1);
-    const int16_t y = chartY(nm * GLIDE_FT_PER_NM);
-    if (y < MATRIX_H - 1) c.drawPixel(chartX(nm, arrival), y, C_PATH);
-  }
-  if (!m) return;
-  for (uint8_t i = 0; i < m->trail_n; i++) {
-    const float k = 0.3f + 0.7f * (i + 1) / (m->trail_n + 1);
-    c.drawPixel(chartX(m->trail_dst[i], arrival), chartY(m->trail_alt[i]),
-                rgb565(0, (uint8_t)(TRAIL_G * k), (uint8_t)(TRAIL_B * k)));
-  }
-  float nm, ft;
-  glidePosition(*m, now, nm, ft);
-  const int16_t x = chartX(nm, arrival), y = chartY(ft);
-  c.fillRect(arrival ? x : x - 1, y - 1, 2, 2, C_PLANE);
+  if (m) c.fillRect(px, chartY(ft) - 1, 2, 2, C_PLANE);
 }
 
 // The place's scroll, pixels from its start: still for SCROLL_HOLD_MS, a
 // pixel every g_scroll_ms to its end, still again, then from the start.
 static int16_t placeOffset(const char *place, uint32_t now) {
-  const int16_t over = (int16_t)strlen(place) * CHAR_ADVANCE - (MATRIX_W - TEXT_X);
+  const int16_t over = (int16_t)strlen(place) * CHAR_ADVANCE - TEXT_W;
   if (over <= 0) return 0;
   const uint32_t step = g_scroll_ms > 0 ? (uint32_t)g_scroll_ms : 40;
   const uint32_t cycle = 2 * SCROLL_HOLD_MS + (uint32_t)over * step;
@@ -309,6 +373,7 @@ static uint32_t drawKey(const Movement *m, uint32_t now) {
   float nm, ft;
   glidePosition(*m, now, nm, ft);
   return ((uint32_t)chartX(nm, m->arrival) << 24) ^ ((uint32_t)chartY(ft) << 16) ^
+         ((uint32_t)lroundf(ft / ALT_STEP_FT) << 8) ^
          ((uint32_t)placeOffset(m->place, now) << 4) ^ (m == &s_cur.dep ? 2u : 4u);
 }
 
@@ -322,14 +387,14 @@ static void draw(uint32_t now) {
     char code[sizeof(g_ap_code)];
     snprintf(code, sizeof(code), "%s", g_ap_code);
     for (char *p = code; *p; p++) *p = (char)toupper((unsigned char)*p);
-    drawText(TEXT_X, 0, code, C_NUMBER);
+    drawText(0, 0, code, C_NUMBER);
     return;
   }
-  drawText(TEXT_X, 0, m->number, C_NUMBER);
-  drawText(TEXT_X - placeOffset(m->place, now), ROW_H, m->place, C_PLACE);
-  // A scrolled place runs under the mark: cleared, and the mark on top.
-  c.fillRect(0, ROW_H, TEXT_X, ROW_H, 0);
-  drawAirlineMark(0, 0, m->airline);
+  drawText(0, 0, m->number, C_NUMBER);
+  drawText(-placeOffset(m->place, now), ROW_H, m->place, C_PLACE);
+  // A long place runs on under the mark: cleared, and the mark on top.
+  c.fillRect(TEXT_W, 0, MATRIX_W - TEXT_W, 2 * ROW_H, 0);
+  drawAirlineMark(MARK_X, 0, m->airline);
 }
 
 static void airportEnter() {

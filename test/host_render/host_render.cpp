@@ -13,6 +13,7 @@
 #include "project/airline_logos.h"
 #include "project/body_blocks.h"
 #include "project/json_walk.h"
+#include "project/modes/aviation.h"
 #include "project/tfl_rename.h"
 #include "project/gs_state.h"
 #include "project/matrix/matrix.h"
@@ -60,6 +61,11 @@ static std::string answerFor(const char *url, int &code, char *err, size_t n) {
     // airline flights below 7,000 ft (SHT19Q: "unknown callsign").
     { "51.4700",                     "adsb_lhr.json" },
     { "51.4701",                     "adsb_lhr_quiet.json" },
+    // Ten seconds on: SHT19Q lower and nearer, and Aeromexico 8 climbing
+    // out, whose transponder says AMX008 and adsbdb only knows as AMX8.
+    { "51.4702",                     "adsb_lhr_later.json" },
+    { "callsign/AMX008",             "adsbdb_AMX008.json" },
+    { "callsign/AMX8",               "adsbdb_AMX8.json" },
     { "callsign/SHT19Q",             "adsbdb_SHT19Q.json" },
     { "callsign/BAW249",             "adsbdb_BAW249.json" },
     { "callsign/TAP1366",            "adsbdb_TAP1366.json" },
@@ -189,12 +195,19 @@ static bool urlAsked(const char *part) {
   return false;
 }
 
-// The airline's mark exactly, top left.
-static bool markIs(const uint16_t *logo) {
+// The airline's mark exactly, at the top, from column x0 (Flights: the
+// left edge; Airport: the right).
+static bool markIs(const uint16_t *logo, int x0 = 0) {
   for (int y = 0; y < AIRLINE_LOGO_SIZE; y++)
     for (int x = 0; x < AIRLINE_LOGO_SIZE; x++)
-      if (px(x, y) != logo[y * AIRLINE_LOGO_SIZE + x]) return false;
+      if (px(x0 + x, y) != logo[y * AIRLINE_LOGO_SIZE + x]) return false;
   return true;
+}
+
+// Any pixel of colour c in the box [x0, x1) x [y0, y1).
+static bool boxHas(int x0, int y0, int x1, int y1, uint16_t c) {
+  for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) if (px(x, y) == c) return true;
+  return false;
 }
 
 // The callsign's prefix, and the curated list behind it.
@@ -355,6 +368,17 @@ int main(int argc, char **argv) {
   assert(flightRank("EZY12AB") == 2 && flightRank("NJE123") == 1 && flightRank("GKUBE") == 0);
   snprintf(g_fl_lat, sizeof g_fl_lat, "51.5074");
 
+  // ---- Callsigns: the number without its leading zeros ----
+  {
+    char u[10];
+    assert(callsignUnpadded("AMX008", u, sizeof u) && strcmp(u, "AMX8") == 0);
+    assert(callsignUnpadded("BAW001", u, sizeof u) && strcmp(u, "BAW1") == 0);
+    assert(callsignUnpadded("EIN07W", u, sizeof u) && strcmp(u, "EIN7W") == 0);
+    assert(!callsignUnpadded("BAW136", u, sizeof u));
+    assert(!callsignUnpadded("EZY80AB", u, sizeof u));
+    assert(!callsignUnpadded("GKUBE", u, sizeof u));
+  }
+
   // ---- Airport: Heathrow ----
   // The nearest airline flights below 7,000 ft: SHT19Q at 3.8 nm coming
   // down on the glide path (adsbdb has no route: judged by its flight),
@@ -377,7 +401,11 @@ int main(int argc, char **argv) {
     dump("airport_arrival");
     assert(urlAsked("51.4700") && urlAsked("callsign/SHT19Q") && urlAsked("callsign/BAW249"));
     assert(!urlAsked("callsign/TAP1366"));                // two lookups a fetch, and both ends found
-    assert(markIs(airlineLogo("SHT")));                   // the Shuttle is BA's
+    const int MARK_X = MATRIX_W - AIRLINE_LOGO_SIZE;
+    const uint16_t C_ALT = rgb565(0, 220, 255);
+    assert(markIs(airlineLogo("SHT"), MARK_X));           // the Shuttle is BA's, top right
+    assert(boxHas(0, 26, 32, 31, C_ALT));                 // 1,050ft, bottom left while landing
+    assert(!boxHas(32, 26, MATRIX_W, 31, C_ALT));
     assert(rowHasColour(0, C_NUMBER));                    // SHT19Q
     assert(!rowHasColour(8, C_PLACE));                    // no route: no place
     assert(px(MATRIX_W - 1, MATRIX_H - 1) == C_RUNWAY && px(0, MATRIX_H - 1) != C_RUNWAY);
@@ -395,14 +423,35 @@ int main(int argc, char **argv) {
     dump("airport_departure");
     assert(px(0, MATRIX_H - 1) == C_RUNWAY && px(MATRIX_W - 1, MATRIX_H - 1) != C_RUNWAY);
     assert(rowHasColour(8, C_PLACE) && planeOnChart());
+    assert(boxHas(32, 26, MATRIX_W, 31, C_ALT) && !boxHas(0, 26, 32, 31, C_ALT));   // bottom right leaving
     runFor(MODE_AIRPORT_OPS, 8000);
     assert(px(MATRIX_W - 1, MATRIX_H - 1) == C_RUNWAY);
     runFor(MODE_AIRPORT_OPS, 8000);
     assert(px(0, MATRIX_H - 1) == C_RUNWAY);
 
-    // The same aircraft again: a dot on its trail, and the plane moved on.
+    // The same aircraft again, in the same place: nothing flown between.
     fetchCommit(MODE_AIRPORT_OPS);
     assert(planeOnChart());
+
+    // Ten seconds on: SHT19Q came down from 1,050 ft at 3.8 nm to 800 ft
+    // at 3.0 nm, and the amber dots behind it are the heights between.
+    g_ap_show = AP_SHOW_ARRIVALS;
+    snprintf(g_ap_lat, sizeof g_ap_lat, "51.4702");
+    g_urls.clear();
+    fetchCommit(MODE_AIRPORT_OPS);
+    dump("airport_flown");
+    {
+      int flown = 0;
+      for (int y = 16; y < MATRIX_H; y++) for (int x = 0; x < MATRIX_W; x++) flown += px(x, y) == C_PLACE;
+      assert(flown >= 2);
+    }
+    // AMX008, unknown to adsbdb as broadcast, is AMX8 for Mexico City.
+    assert(urlAsked("callsign/AMX008") && urlAsked("callsign/AMX8"));
+    g_ap_show = AP_SHOW_NEAREST;                          // AMX8 at 2.0 nm, nearest
+    runFor(MODE_AIRPORT_OPS, 200);
+    dump("airport_amx8");
+    assert(px(0, MATRIX_H - 1) == C_RUNWAY && rowHasColour(8, C_PLACE));
+    snprintf(g_ap_lat, sizeof g_ap_lat, "51.4700");
 
     // The code instead of the city: fits, no scroll.
     g_ap_place = AP_PLACE_CODE;
@@ -413,6 +462,7 @@ int main(int argc, char **argv) {
     fetchCommit(MODE_AIRPORT_OPS);
     dump("airport_quiet");
     assert(rowHasColour(0, C_NUMBER) && !planeOnChart());
+    assert(!boxHas(0, 16, MATRIX_W, MATRIX_H, C_ALT));    // no plane, no altitude
     assert(px(MATRIX_W - 1, MATRIX_H - 1) == C_RUNWAY);
     snprintf(g_ap_lat, sizeof g_ap_lat, "51.4700");
     g_ap_show = AP_SHOW_NEAREST;
