@@ -30,7 +30,8 @@ static uint32_t s_last_try_ms = 0, s_last_state_ms = 0;
 static bool s_state_dirty = true;
 static uint8_t s_last_on_brightness = 255;
 
-static const char *MODE_NAMES[] = { "Tube", "Flights", "Unifi" };
+static const char *MODE_NAMES[] = { "Tube", "Flights", "Unifi", "Airport" };
+static_assert(sizeof(MODE_NAMES) / sizeof(MODE_NAMES[0]) == MODE_COUNT, "a name for every mode");
 static const char *PARTY_NAMES[] = { "off", "chill", "on" };
 
 bool mqttConnected() { return s_mqtt.connected(); }

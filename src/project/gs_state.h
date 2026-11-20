@@ -7,7 +7,8 @@
 //  (project_settings.cpp); everything else reads them.
 // ============================================================
 
-enum DisplayModeId : uint8_t { MODE_TUBE = 0, MODE_FLIGHTS = 1, MODE_UNIFI = 2, MODE_COUNT };
+enum DisplayModeId : uint8_t { MODE_TUBE = 0, MODE_FLIGHTS = 1, MODE_UNIFI = 2, MODE_AIRPORT = 3,
+                               MODE_COUNT };
 enum PartyMode : uint8_t { PARTY_OFF = 0, PARTY_CHILL = 1, PARTY_ON = 2 };
 
 // ---- Display ---------------------------------------------------------------
@@ -29,6 +30,17 @@ extern char    g_fl_lat[16];
 extern char    g_fl_lon[16];
 extern int32_t g_fl_radius_nm;
 extern int32_t g_fl_min_alt_ft;    // ignore aircraft below this (taxiing, helicopters)
+
+// ---- Airport ---------------------------------------------------------------
+// Which plane the Airport mode shows when there are several.
+enum AirportShow : uint8_t { AP_SHOW_NEAREST = 0, AP_SHOW_ARRIVALS = 1, AP_SHOW_ALTERNATE = 2 };
+// How it names the other end of the flight.
+enum AirportPlace : uint8_t { AP_PLACE_CITY = 0, AP_PLACE_CODE = 1 };
+extern char    g_ap_code[8];       // IATA or ICAO: "LHR", "EGLL"
+extern char    g_ap_lat[16];
+extern char    g_ap_lon[16];
+extern uint8_t g_ap_show;          // AirportShow
+extern uint8_t g_ap_place;         // AirportPlace
 
 // ---- Unifi -----------------------------------------------------------------
 enum UnifiAuth : uint8_t { UNIFI_AUTH_KEY = 0, UNIFI_AUTH_OS_LOGIN = 1, UNIFI_AUTH_CLASSIC = 2 };
@@ -67,4 +79,4 @@ extern uint8_t  g_party;           // PartyMode, from MQTT or the web
 extern uint8_t  g_brightness_target;
 extern bool     g_mode_changed;    // set by the registry, consumed by the loop
 
-const char* modeKey(uint8_t mode);  // "tube", "flights", "unifi"
+const char* modeKey(uint8_t mode);  // "tube", "flights", "unifi", "airport"

@@ -33,6 +33,7 @@ static const char *testButton(const char *mode) {
 
 const char *gsWebExtraTube()  { return testButton("tube"); }
 const char *gsWebExtraUnifi() { return testButton("unifi"); }
+const char *gsWebExtraAirport() { return testButton("airport"); }
 
 // v1 took a box, "lat1,lat2,lon1,lon2". The centre is its middle; the radius
 // reaches its nearest edge, so nothing outside the old box shows up.

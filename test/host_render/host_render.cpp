@@ -56,6 +56,15 @@ static std::string answerFor(const char *url, int &code, char *err, size_t n) {
     // feeds' keys ("ac" and "aircraft"), so either feed can be asked first.
     { "51.6001",                     "adsb_mixed_sky.json" },
     { "51.6002",                     "adsb_no_listed_airline.json" },
+    // Heathrow at 22:25 on 20.11.2026, and the routes adsbdb gave for its
+    // airline flights below 7,000 ft (SHT19Q: "unknown callsign").
+    { "51.4700",                     "adsb_lhr.json" },
+    { "51.4701",                     "adsb_lhr_quiet.json" },
+    { "callsign/SHT19Q",             "adsbdb_SHT19Q.json" },
+    { "callsign/BAW249",             "adsbdb_BAW249.json" },
+    { "callsign/TAP1366",            "adsbdb_TAP1366.json" },
+    { "callsign/AIC67V",             "adsbdb_AIC67V.json" },
+    { "callsign/BAW469",             "adsbdb_BAW469.json" },
     { "api.adsb.lol",                "adsb_london.json" },
     { "opendata.adsb.fi",            "adsbfi_london.json" },
     { "api.adsbdb.com",              "adsbdb_THA917.json" },
@@ -345,6 +354,70 @@ int main(int argc, char **argv) {
   assert(px(0, 8) == rgb565(120, 120, 120));           // the plane, not a logo
   assert(flightRank("EZY12AB") == 2 && flightRank("NJE123") == 1 && flightRank("GKUBE") == 0);
   snprintf(g_fl_lat, sizeof g_fl_lat, "51.5074");
+
+  // ---- Airport: Heathrow ----
+  // The nearest airline flights below 7,000 ft: SHT19Q at 3.8 nm coming
+  // down on the glide path (adsbdb has no route: judged by its flight),
+  // BAW249 at 5.4 nm climbing out for Rio, TAP1366 at 8.6 nm in from Lisbon.
+  {
+    const uint16_t C_PLACE = rgb565(255, 120, 0), C_RUNWAY = rgb565(160, 160, 160);
+    const uint16_t C_PLANE = rgb565(255, 255, 255), C_NUMBER = rgb565(210, 210, 210);
+    auto planeOnChart = [&]() {
+      for (int y = 16; y < MATRIX_H; y++) for (int x = 0; x < MATRIX_W; x++) if (px(x, y) == C_PLANE) return true;
+      return false;
+    };
+    snprintf(g_ap_code, sizeof g_ap_code, "LHR");
+    snprintf(g_ap_lat, sizeof g_ap_lat, "51.4700");
+    snprintf(g_ap_lon, sizeof g_ap_lon, "-0.4543");
+    g_ap_show = AP_SHOW_NEAREST;
+    g_ap_place = AP_PLACE_CITY;
+    g_urls.clear();
+    MODE_AIRPORT_OPS.enter();
+    fetchCommit(MODE_AIRPORT_OPS);
+    dump("airport_arrival");
+    assert(urlAsked("51.4700") && urlAsked("callsign/SHT19Q") && urlAsked("callsign/BAW249"));
+    assert(!urlAsked("callsign/TAP1366"));                // two lookups a fetch, and both ends found
+    assert(markIs(airlineLogo("SHT")));                   // the Shuttle is BA's
+    assert(rowHasColour(0, C_NUMBER));                    // SHT19Q
+    assert(!rowHasColour(8, C_PLACE));                    // no route: no place
+    assert(px(MATRIX_W - 1, MATRIX_H - 1) == C_RUNWAY && px(0, MATRIX_H - 1) != C_RUNWAY);
+    assert(planeOnChart());
+
+    // Arrivals only: still SHT19Q. In turn: BAW249's departure after 8 s,
+    // its runway at the left and "Rio De Janeiro" scrolling.
+    g_ap_show = AP_SHOW_ARRIVALS;
+    runFor(MODE_AIRPORT_OPS, 9000);
+    assert(px(MATRIX_W - 1, MATRIX_H - 1) == C_RUNWAY);
+    // The arrival has had its 8 s by now: the departure comes at once, and
+    // the arrival again 8 s later.
+    g_ap_show = AP_SHOW_ALTERNATE;
+    runFor(MODE_AIRPORT_OPS, 500);
+    dump("airport_departure");
+    assert(px(0, MATRIX_H - 1) == C_RUNWAY && px(MATRIX_W - 1, MATRIX_H - 1) != C_RUNWAY);
+    assert(rowHasColour(8, C_PLACE) && planeOnChart());
+    runFor(MODE_AIRPORT_OPS, 8000);
+    assert(px(MATRIX_W - 1, MATRIX_H - 1) == C_RUNWAY);
+    runFor(MODE_AIRPORT_OPS, 8000);
+    assert(px(0, MATRIX_H - 1) == C_RUNWAY);
+
+    // The same aircraft again: a dot on its trail, and the plane moved on.
+    fetchCommit(MODE_AIRPORT_OPS);
+    assert(planeOnChart());
+
+    // The code instead of the city: fits, no scroll.
+    g_ap_place = AP_PLACE_CODE;
+    fetchCommit(MODE_AIRPORT_OPS);
+
+    // Nothing near: the airport's code, the path and the runway, no plane.
+    snprintf(g_ap_lat, sizeof g_ap_lat, "51.4701");
+    fetchCommit(MODE_AIRPORT_OPS);
+    dump("airport_quiet");
+    assert(rowHasColour(0, C_NUMBER) && !planeOnChart());
+    assert(px(MATRIX_W - 1, MATRIX_H - 1) == C_RUNWAY);
+    snprintf(g_ap_lat, sizeof g_ap_lat, "51.4700");
+    g_ap_show = AP_SHOW_NEAREST;
+    g_ap_place = AP_PLACE_CITY;
+  }
 
   // ---- Unifi ----
   snprintf(g_unifi_url, sizeof g_unifi_url, "https://192.168.1.1");

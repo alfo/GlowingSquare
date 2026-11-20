@@ -21,6 +21,12 @@ char    g_fl_lon[16]       = "";
 int32_t g_fl_radius_nm     = 10;
 int32_t g_fl_min_alt_ft    = 500;
 
+char    g_ap_code[8]       = "LHR";
+char    g_ap_lat[16]       = "51.4700";
+char    g_ap_lon[16]       = "-0.4543";
+uint8_t g_ap_show          = AP_SHOW_NEAREST;
+uint8_t g_ap_place         = AP_PLACE_CITY;
+
 char    g_unifi_url[64]    = "";
 char    g_unifi_site[24]   = "default";
 uint8_t g_unifi_auth       = UNIFI_AUTH_KEY;

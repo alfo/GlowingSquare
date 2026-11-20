@@ -3,17 +3,21 @@
 // boot and writes it back when it changes.
 #include "services/settings_registry.h"
 
+#include <strings.h>
+
 #include "project/gs_state.h"
 #include "project/gs_web_extra.h"
 #include "project/matrix/matrix.h"
 #include "project/modes/modes.h"
 #include "lang.h"
 
-enum Section : uint8_t { SEC_DISPLAY = 0, SEC_TUBE, SEC_FLIGHTS, SEC_UNIFI, SEC_MQTT, SEC_PINS };
+enum Section : uint8_t { SEC_DISPLAY = 0, SEC_TUBE, SEC_FLIGHTS, SEC_AIRPORT, SEC_UNIFI, SEC_MQTT,
+                         SEC_PINS };
 
 static bool modeTube()    { return g_mode == MODE_TUBE; }
 static bool modeFlights() { return g_mode == MODE_FLIGHTS; }
 static bool modeUnifi()   { return g_mode == MODE_UNIFI; }
+static bool modeAirport() { return g_mode == MODE_AIRPORT; }
 static bool mqttOn()      { return g_mqtt_on; }
 static bool unifiKey()    { return g_unifi_auth == UNIFI_AUTH_KEY; }
 static bool unifiLogin()  { return g_unifi_auth != UNIFI_AUTH_KEY; }
@@ -27,6 +31,29 @@ static bool always()      { return true; }
 static void modeChanged() { g_mode_changed = true; }
 // A changed stop, line or address shows on the next pass, not a minute later.
 static void sourceChanged() { fetchNow(); }
+
+// London's airports by either code, so a code is all most people type. The
+// position is the middle of the airfield; anywhere else is typed by hand.
+struct KnownAirport { const char *iata, *icao, *lat, *lon; };
+static const KnownAirport KNOWN_AIRPORTS[] = {
+  { "LHR", "EGLL", "51.4700", "-0.4543" },
+  { "LGW", "EGKK", "51.1537", "-0.1821" },
+  { "LCY", "EGLC", "51.5048", "0.0495" },
+  { "STN", "EGSS", "51.8860", "0.2389" },
+  { "LTN", "EGGW", "51.8747", "-0.3683" },
+  { "SEN", "EGMC", "51.5714", "0.6956" },
+};
+
+static void airportChanged() {
+  for (const KnownAirport &a : KNOWN_AIRPORTS) {
+    if (strcasecmp(g_ap_code, a.iata) != 0 && strcasecmp(g_ap_code, a.icao) != 0) continue;
+    const SettingDesc *lat = settingById("ap_lat"), *lon = settingById("ap_lon");
+    if (lat) settingSetText(*lat, a.lat);
+    if (lon) settingSetText(*lon, a.lon);
+    break;
+  }
+  fetchNow();
+}
 #ifdef MATRIX_PXMATRIX
 static void timingChanged() { matrixApplyTiming(); }
 #endif
@@ -35,6 +62,7 @@ const SettingSection SETTING_SECTIONS[] = {
   { "display", STR_P_SEC_DISPLAY, STR_P_SEC_DISPLAY_INFO, nullptr,     nullptr },
   { "tube",    STR_P_SEC_TUBE,    STR_P_SEC_TUBE_INFO,    modeTube,    gsWebExtraTube },
   { "flights", STR_P_SEC_FLIGHTS, STR_P_SEC_FLIGHTS_INFO, modeFlights, gsWebExtraFlights },
+  { "airport", STR_P_SEC_AIRPORT, STR_P_SEC_AIRPORT_INFO, modeAirport, gsWebExtraAirport },
   { "unifi",   STR_P_SEC_UNIFI,   STR_P_SEC_UNIFI_INFO,   modeUnifi,   gsWebExtraUnifi },
   { "mqtt",    STR_P_SEC_MQTT,    STR_P_SEC_MQTT_INFO,    nullptr,     nullptr },
 #ifdef MATRIX_DMA
@@ -46,7 +74,11 @@ const SettingSection SETTING_SECTIONS[] = {
 };
 const size_t SETTING_SECTIONS_COUNT = sizeof(SETTING_SECTIONS) / sizeof(SETTING_SECTIONS[0]);
 
-static const uint16_t OPT_MODE[]  = { STR_P_MODE_TUBE, STR_P_MODE_FLIGHTS, STR_P_MODE_UNIFI };
+static const uint16_t OPT_MODE[]  = { STR_P_MODE_TUBE, STR_P_MODE_FLIGHTS, STR_P_MODE_UNIFI,
+                                      STR_P_MODE_AIRPORT };
+static const uint16_t OPT_APSHOW[] = { STR_P_AP_SHOW_NEAREST, STR_P_AP_SHOW_ARRIVALS,
+                                       STR_P_AP_SHOW_ALTERNATE };
+static const uint16_t OPT_APPLACE[] = { STR_P_AP_PLACE_CITY, STR_P_AP_PLACE_CODE };
 static const uint16_t OPT_DIR[]   = { STR_P_TFL_DIR_BOTH, STR_P_TFL_DIR_IN, STR_P_TFL_DIR_OUT };
 static const uint16_t OPT_UAUTH[] = { STR_P_UNIFI_AUTH_KEY, STR_P_UNIFI_AUTH_OS, STR_P_UNIFI_AUTH_OLD };
 
@@ -89,6 +121,15 @@ const SettingDesc SETTINGS[] = {
   settingInt("fl_radius", SEC_FLIGHTS, &g_fl_radius_nm, STR_P_FL_RADIUS, 10, 1, 100).unitLabel("nm").onChange(sourceChanged),
   settingInt("fl_min_alt", SEC_FLIGHTS, &g_fl_min_alt_ft, STR_P_FL_MIN_ALT, 500, 0, 40000)
       .unitLabel("ft").info(STR_P_FL_MIN_ALT_INFO).onChange(sourceChanged),
+
+  // ---- Airport ----
+  SETTING_TEXT("ap_code", SEC_AIRPORT, g_ap_code, STR_P_AP_CODE, "LHR")
+      .info(STR_P_AP_CODE_INFO).onChange(airportChanged),
+  SETTING_TEXT("ap_lat", SEC_AIRPORT, g_ap_lat, STR_P_FL_LAT, "51.4700").onChange(sourceChanged),
+  SETTING_TEXT("ap_lon", SEC_AIRPORT, g_ap_lon, STR_P_FL_LON, "-0.4543").onChange(sourceChanged),
+  SETTING_ENUM("ap_show", SEC_AIRPORT, &g_ap_show, STR_P_AP_SHOW, AP_SHOW_NEAREST, OPT_APSHOW)
+      .info(STR_P_AP_SHOW_INFO),
+  SETTING_ENUM("ap_place", SEC_AIRPORT, &g_ap_place, STR_P_AP_PLACE, AP_PLACE_CITY, OPT_APPLACE),
 
   // ---- Unifi ----
   SETTING_TEXT("unifi_url", SEC_UNIFI, g_unifi_url, STR_P_UNIFI_URL, "https://192.168.1.1").info(STR_P_UNIFI_URL_INFO).onChange(sourceChanged),
