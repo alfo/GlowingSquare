@@ -228,11 +228,14 @@ static bool airportFetch(char *err, size_t err_n) {
 
 // ---- drawing (loop task) ----------------------------------------------------
 
-static const uint16_t C_NUMBER = rgb565(210, 210, 210);
+// No white but the plane: the number green, the path ahead a dim blue
+// guide (a dim grey read as dim white) ending at a runway in full blue, the
+// heights flown the place's amber.
+static const uint16_t C_NUMBER = rgb565(0, 255, 60);
 static const uint16_t C_PLACE  = rgb565(255, 120, 0);
-static const uint16_t C_PATH   = rgb565(40, 40, 40);
+static const uint16_t C_PATH   = rgb565(0, 30, 110);
 static const uint16_t C_FLOWN  = rgb565(255, 120, 0);   // the place's amber
-static const uint16_t C_RUNWAY = rgb565(160, 160, 160);
+static const uint16_t C_RUNWAY = rgb565(21, 58, 234);   // the Unifi mode's blue
 static const uint16_t C_PLANE  = rgb565(255, 255, 255);
 
 constexpr int16_t MARK_X = MATRIX_W - AIRLINE_LOGO_SIZE;   // the mark, top right
