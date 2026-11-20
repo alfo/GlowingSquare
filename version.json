@@ -1,24 +1,24 @@
 {
   "envs": {
     "gs-mini32-pxmatrix": {
-      "prerelease": "v2.1.0-beta.11",
-      "prerelease_sha256": "173633759ebbe1699ada0fd8cc7b19e2b3460fcd61570280de34c870d59c3b77",
+      "prerelease": "v2.1.0-beta.12",
+      "prerelease_sha256": "53738d7e43c68e5a0e174ea452a8663eeac8ef6ea99fdb0d08e6a2880059398f",
       "prerelease_size": 1661120,
       "stable": "v2.0.0",
       "stable_sha256": "8b94b8397556895b84ac0b12cb1e914d7df2531740ea9d70955eedbdd25e0303",
       "stable_size": 1651360
     },
     "gs-esp32-dma": {
-      "prerelease": "v2.1.0-beta.11",
-      "prerelease_sha256": "7052887f6ccafbbbc8c35555b37b35275060ad229814ed815751508df9971e8c",
+      "prerelease": "v2.1.0-beta.12",
+      "prerelease_sha256": "d114c8002452dc6f6a6970b3865be80152d429d0b3979ef2afd5168b9c26bad9",
       "prerelease_size": 1650240,
       "stable": "v2.0.0",
       "stable_sha256": "92ce633d510f2706f7adcf73945abfd0295bb2c8b8fcb718322efe898d5f3907",
       "stable_size": 1640448
     },
     "gs-s3-dma": {
-      "prerelease": "v2.1.0-beta.11",
-      "prerelease_sha256": "763ef7f32f71d0816cc1b0759d4e2b7e64e8bde563b4d1b9d2a7ddcb24f7bfab",
+      "prerelease": "v2.1.0-beta.12",
+      "prerelease_sha256": "0cb8c923adde30da9c19ddd8cd7db467c739c728426cb01a523099efca7a5d13",
       "prerelease_size": 1620064,
       "stable": "v2.0.0",
       "stable_sha256": "72220587dc05f27fee47d5125ae68d5d82e8b3af347f21837f6a3e75f41579c0",
@@ -26,8 +26,8 @@
     }
   },
   "url": "https://github.com/alfo/GlowingSquare/releases/latest",
-  "prerelease": "v2.1.0-beta.11",
-  "prerelease_sha256": "173633759ebbe1699ada0fd8cc7b19e2b3460fcd61570280de34c870d59c3b77",
+  "prerelease": "v2.1.0-beta.12",
+  "prerelease_sha256": "53738d7e43c68e5a0e174ea452a8663eeac8ef6ea99fdb0d08e6a2880059398f",
   "prerelease_size": 1661120,
   "stable": "v2.0.0",
   "stable_sha256": "8b94b8397556895b84ac0b12cb1e914d7df2531740ea9d70955eedbdd25e0303",
