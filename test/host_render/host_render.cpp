@@ -14,6 +14,7 @@
 #include "project/body_blocks.h"
 #include "project/json_walk.h"
 #include "project/modes/aviation.h"
+#include "project/place_name.h"
 #include "project/tfl_rename.h"
 #include "project/gs_state.h"
 #include "project/matrix/matrix.h"
@@ -379,6 +380,21 @@ int main(int argc, char **argv) {
     assert(!callsignUnpadded("GKUBE", u, sizeof u));
   }
 
+  // ---- A city as the panel can show it ----
+  {
+    auto city = [](const char *in) { static char o[32]; placeName(in, o, sizeof o); return std::string(o); };
+    assert(city("Arnavutk\xC3\xB6y, Istanbul") == "Istanbul");     // the district goes
+    assert(city("Washington, DC") == "Washington");                // a state's letters go
+    assert(city("S\xC3\xA3o Paulo") == "Sao Paulo");
+    assert(city("Z\xC3\xBCrich") == "Zurich");                    // the label fonts' umlaut too
+    assert(city("Krak\xC3\xB3w") == "Krakow");
+    assert(city("Gda\xC5\x84sk") == "Gdansk");                    // Latin Extended-A
+    assert(city("\xC4\xB0zmir") == "Izmir");
+    assert(city("\xC5\x81\xC3\xB3" "d" "\xC5\xBA") == "Lodz");
+    assert(city("Tokyo \xE6\x9D\xB1\xE4\xBA\xAC") == "Tokyo ");   // nothing it cannot draw
+    assert(city("London") == "London");
+  }
+
   // ---- Airport: Heathrow ----
   // The nearest airline flights below 7,000 ft: SHT19Q at 3.8 nm coming
   // down on the glide path (adsbdb has no route: judged by its flight),
@@ -451,6 +467,20 @@ int main(int argc, char **argv) {
     runFor(MODE_AIRPORT_OPS, 200);
     dump("airport_amx8");
     assert(px(0, MATRIX_H - 1) == C_RUNWAY && rowHasColour(8, C_PLACE));
+    // "Mexico City" scrolls once, as a Tube destination does, then is back
+    // at its start and still: the same line 3 s and 8 s on.
+    {
+      auto placeRow = [&]() {
+        std::vector<uint16_t> r;
+        for (int y = 8; y < 16; y++) for (int x = 0; x < MATRIX_W - AIRLINE_LOGO_SIZE; x++) r.push_back(px(x, y));
+        return r;
+      };
+      runFor(MODE_AIRPORT_OPS, 3000);
+      const auto settled = placeRow();
+      assert(px(0, 9) == C_PLACE);                        // the M's stem, at the left edge again
+      runFor(MODE_AIRPORT_OPS, 5000);
+      assert(placeRow() == settled);
+    }
     snprintf(g_ap_lat, sizeof g_ap_lat, "51.4700");
 
     // The code instead of the city: fits, no scroll.

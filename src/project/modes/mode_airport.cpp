@@ -29,6 +29,7 @@
 
 #include "project/airline_logos.h"
 #include "project/gs_state.h"
+#include "project/place_name.h"
 #include "project/modes/aviation.h"
 #include "project/modes/modes.h"
 #include "project/render.h"
@@ -56,7 +57,6 @@
 #define GLIDE_FT_PER_NM      318.0f    // a 3 degree path
 #define ALTERNATE_MS         8000UL
 #define FRAME_MS             100UL
-#define SCROLL_HOLD_MS       2000UL
 #define FETCH_INTERVAL_MS    10000UL
 // How long the plane moves on from its last position before it waits for
 // the next one: a failed fetch must not fly it off the chart.
@@ -144,7 +144,8 @@ static void fill(Movement &m, const Candidate &c, const Route *r, bool arrival) 
   if (r) {
     const char *city = arrival ? r->from_city : r->to_city;
     const char *code = arrival ? r->from : r->to;
-    snprintf(m.place, sizeof(m.place), "%s", g_ap_place == AP_PLACE_CITY && city[0] ? city : code);
+    if (g_ap_place == AP_PLACE_CITY && city[0]) placeName(city, m.place, sizeof(m.place));
+    else snprintf(m.place, sizeof(m.place), "%s", code);
   }
   m.dst = c.dst;
   m.alt = c.alt;
@@ -354,17 +355,15 @@ static void drawChart(const Movement *m, bool arrival, uint32_t now) {
   if (m) c.fillRect(px, chartY(ft) - 1, 2, 2, C_PLANE);
 }
 
-// The place's scroll, pixels from its start: still for SCROLL_HOLD_MS, a
-// pixel every g_scroll_ms to its end, still again, then from the start.
+// The place's scroll, as Tube scrolls a destination: once, a pixel every
+// g_scroll_ms from s_scroll_ms until its end has shown, then back at its
+// start and still. 0 while it fits.
 static int16_t placeOffset(const char *place, uint32_t now) {
   const int16_t over = (int16_t)strlen(place) * CHAR_ADVANCE - TEXT_W;
   if (over <= 0) return 0;
   const uint32_t step = g_scroll_ms > 0 ? (uint32_t)g_scroll_ms : 40;
-  const uint32_t cycle = 2 * SCROLL_HOLD_MS + (uint32_t)over * step;
-  const uint32_t t = (now - s_scroll_ms) % cycle;
-  if (t < SCROLL_HOLD_MS) return 0;
-  const uint32_t moving = (t - SCROLL_HOLD_MS) / step;
-  return (int16_t)(moving < (uint32_t)over ? moving : over);
+  const uint32_t moved = (now - s_scroll_ms) / step;
+  return moved <= (uint32_t)over ? (int16_t)moved : 0;
 }
 
 // Everything that decides the picture, packed: a new key, a new draw.
@@ -414,6 +413,9 @@ static void airportCommit() {
 static bool airportFrame(uint32_t now) {
   if (now - s_frame_ms < FRAME_MS) return false;
   s_frame_ms = now;
+  // The same plane still showing: its place scrolls again as often as a
+  // Tube destination does, once an update.
+  if (now - s_scroll_ms >= MODE_TUBE_OPS.interval_ms) s_scroll_ms = now;
   if (g_ap_show == AP_SHOW_ALTERNATE && s_cur.arr.valid && s_cur.dep.valid &&
       now - s_alt_ms >= ALTERNATE_MS) {
     s_alt_dep = !s_alt_dep;
