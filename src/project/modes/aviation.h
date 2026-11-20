@@ -49,6 +49,11 @@ const Route *routeFor(const char *callsign, bool ask = true);
 // True when `code` (IATA or ICAO, any case) is that end of a route.
 bool routeEndIs(const char *code, const char *iata, const char *icao);
 
+// "AMX008" -> "AMX8": the flight number without its leading zeros, as
+// adsbdb files it (the transponder pads it, the timetable does not). False,
+// and out untouched, when there are none to take off.
+bool callsignUnpadded(const char *callsign, char *out, size_t n);
+
 // "BAW136  " -> "BAW136": the feeds pad callsigns to eight.
 void trimRight(char *s);
 

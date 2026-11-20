@@ -70,9 +70,10 @@ static void routeEnd(JsonObjectConst a, char *code, char *icao, char *city) {
   snprintf(city, sizeof(Route::from_city), "%s", a["municipality"] | "");
 }
 
-static void ask(Route &r) {
+// adsbdb's answer for `as` into r. False when it has none.
+static bool lookUp(Route &r, const char *as) {
   char url[96];
-  snprintf(url, sizeof(url), "https://api.adsbdb.com/v0/callsign/%s", r.callsign);
+  snprintf(url, sizeof(url), "https://api.adsbdb.com/v0/callsign/%s", as);
   JsonDocument filter;
   JsonObject fr = filter["response"]["flightroute"].to<JsonObject>();
   fr["callsign_iata"] = true;
@@ -86,13 +87,33 @@ static void ask(Route &r) {
   GsHttp req;
   req.url = url;
   req.buffer_max = GS_HTTP_BUFFER_MAX;
-  if (!gsHttpOk(gsHttpJson(req, doc, &filter, err, sizeof(err)))) return;
+  if (!gsHttpOk(gsHttpJson(req, doc, &filter, err, sizeof(err)))) return false;
   JsonObjectConst route = doc["response"]["flightroute"];
-  if (route.isNull()) return;
+  if (route.isNull()) return false;
   routeEnd(route["origin"], r.from, r.from_icao, r.from_city);
   routeEnd(route["destination"], r.to, r.to_icao, r.to_city);
   snprintf(r.number, sizeof(r.number), "%s", route["callsign_iata"] | "");
   r.known = r.from[0] && r.to[0];
+  return r.known;
+}
+
+// As broadcast first, then without the number's leading zeros: Aeromexico's
+// AMX008 is unknown to adsbdb, its AMX8 is London to Mexico City.
+static void ask(Route &r) {
+  if (lookUp(r, r.callsign)) return;
+  char unpadded[sizeof(r.callsign)];
+  if (callsignUnpadded(r.callsign, unpadded, sizeof(unpadded))) lookUp(r, unpadded);
+}
+
+bool callsignUnpadded(const char *callsign, char *out, size_t n) {
+  if (!callsign || strlen(callsign) < 5) return false;
+  for (int i = 0; i < 3; i++)
+    if (callsign[i] < 'A' || callsign[i] > 'Z') return false;
+  size_t i = 3;
+  while (callsign[i] == '0' && callsign[i + 1] >= '0' && callsign[i + 1] <= '9') i++;
+  if (i == 3) return false;
+  snprintf(out, n, "%.3s%s", callsign, callsign + i);
+  return true;
 }
 
 const Route *routeFor(const char *callsign, bool ask_now) {
